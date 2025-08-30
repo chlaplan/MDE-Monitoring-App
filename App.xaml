@@ -1,0 +1,65 @@
+﻿<Application x:Class="MDE_Monitoring_App.App"
+             xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             StartupUri="MainWindow.xaml">
+    <Application.Resources>
+
+        <!-- Colors -->
+        <Color x:Key="PrimaryBlueColor">#0078D4</Color>
+        <Color x:Key="PrimaryLightBlueColor">#E6F0FA</Color>
+        <Color x:Key="HeaderTextColor">White</Color>
+        <Color x:Key="ButtonHoverColor">#005A9E</Color>
+
+        <!-- Brushes -->
+        <SolidColorBrush x:Key="PrimaryBlue" Color="{StaticResource PrimaryBlueColor}"/>
+        <SolidColorBrush x:Key="PrimaryLightBlue" Color="{StaticResource PrimaryLightBlueColor}"/>
+        <SolidColorBrush x:Key="HeaderTextBrush" Color="{StaticResource HeaderTextColor}"/>
+        <SolidColorBrush x:Key="ButtonHoverBrush" Color="{StaticResource ButtonHoverColor}"/>
+
+        <!-- Button Style -->
+        <Style TargetType="Button">
+            <Setter Property="Background" Value="{StaticResource PrimaryBlue}"/>
+            <Setter Property="Foreground" Value="White"/>
+            <Setter Property="FontWeight" Value="Bold"/>
+            <Setter Property="Padding" Value="8,4"/>
+            <Setter Property="Margin" Value="5,0,0,0"/>
+            <Setter Property="Cursor" Value="Hand"/>
+            <Setter Property="BorderThickness" Value="0"/>
+            <Setter Property="HorizontalAlignment" Value="Left"/>
+            <Setter Property="VerticalAlignment" Value="Center"/>
+            <Setter Property="Template">
+                <Setter.Value>
+                    <ControlTemplate TargetType="Button">
+                        <Border Background="{TemplateBinding Background}" 
+                                CornerRadius="4">
+                            <ContentPresenter HorizontalAlignment="Center" VerticalAlignment="Center"/>
+                        </Border>
+                        <ControlTemplate.Triggers>
+                            <Trigger Property="IsMouseOver" Value="True">
+                                <Setter Property="Background" Value="{StaticResource ButtonHoverBrush}"/>
+                            </Trigger>
+                            <Trigger Property="IsPressed" Value="True">
+                                <Setter Property="Background" Value="#004C87"/>
+                            </Trigger>
+                        </ControlTemplate.Triggers>
+                    </ControlTemplate>
+                </Setter.Value>
+            </Setter>
+        </Style>
+
+        <!-- TextBlock header style -->
+        <Style x:Key="HeaderTextBlock" TargetType="TextBlock">
+            <Setter Property="FontSize" Value="18"/>
+            <Setter Property="FontWeight" Value="Bold"/>
+            <Setter Property="Foreground" Value="{StaticResource PrimaryBlue}"/>
+        </Style>
+
+        <!-- Group Box Style -->
+        <Style TargetType="GroupBox">
+            <Setter Property="Foreground" Value="{StaticResource PrimaryBlue}"/>
+            <Setter Property="FontWeight" Value="Bold"/>
+            <Setter Property="Margin" Value="5"/>
+        </Style>
+
+    </Application.Resources>
+</Application>
