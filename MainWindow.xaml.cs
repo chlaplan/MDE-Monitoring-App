@@ -1,25 +1,32 @@
 ﻿using System.Windows;
+using System.Windows.Controls;
 
 namespace MDE_Monitoring_App
 {
     public partial class MainWindow : Window
     {
-        private readonly MainViewModel _vm;
-
         public MainWindow()
         {
             InitializeComponent();
-            _vm = new MainViewModel();
-            DataContext = new MainViewModel();
+
+            // Ensure DataContext is set so bindings work
+            if (DataContext is null)
+                DataContext = new MainViewModel();
         }
 
         private void RefreshButton_Click(object sender, RoutedEventArgs e)
         {
-            _vm.RefreshData();
-
-            if (LogsDataGrid.Items.Count > 0)
+            if (DataContext is MainViewModel vm)
             {
-                LogsDataGrid.ScrollIntoView(LogsDataGrid.Items[0]);
+                _ = vm.RefreshDataAsync();
+            }
+        }
+
+        private void ClearFirewallFilter_Click(object sender, RoutedEventArgs e)
+        {
+            if (DataContext is MainViewModel vm)
+            {
+                vm.FirewallFilterText = string.Empty;
             }
         }
     }

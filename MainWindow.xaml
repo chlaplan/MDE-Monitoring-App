@@ -1,6 +1,6 @@
 ﻿<Window x:Class="MDE_Monitoring_App.MainWindow"
         xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
-        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml" xmlns:system="clr-namespace:System;assembly=netstandard"
         Title="MDE Monitor" Height="700" Width="1000"
         WindowStartupLocation="CenterScreen"
         Background="#F3F3F3"
@@ -27,10 +27,10 @@
                     <StackPanel Orientation="Horizontal" Margin="0,0,0,10">
                         <TextBlock Text="Defender Status" FontSize="18" FontWeight="Bold" Foreground="#0078D4" VerticalAlignment="Center"/>
                         <Button Content="Refresh" Click="RefreshButton_Click" Margin="20,0,0,0" 
-                    Background="#0078D4" Foreground="White" Padding="6,2"/>
+                                Background="#0078D4" Foreground="White" Padding="6,2"/>
                         <TextBlock Margin="20,0,0,0" VerticalAlignment="Center">
-                <Run Text="Last Refreshed: "/>
-                <Run Text="{Binding LastRefreshed, StringFormat={}{0:MM/dd/yyyy HH:mm:ss}}"/>
+                            <Run Text="Last Refreshed: "/>
+                            <Run Text="{Binding LastRefreshed, Mode=OneWay, StringFormat='Last refreshed: {0:G}'}"/>
                         </TextBlock>
                     </StackPanel>
 
@@ -56,16 +56,225 @@
                                 <TextBlock Text="{Binding DefenderStatus.DeviceControlState, StringFormat=Device Control State: {0}}" Margin="0,2"/>
                             </StackPanel>
                         </Border>
+                        <!-- System Info Card -->
+                        <Border Background="White" BorderBrush="#0078D4" BorderThickness="1" CornerRadius="5" Padding="15" Margin="5">
+                            <StackPanel>
+                                <TextBlock Text="System Info" FontWeight="Bold" FontSize="16" Foreground="#0078D4" Margin="0,0,0,10"/>
+                                <TextBlock Text="{Binding CurrentSystem.CurrentUser, StringFormat=Current User: {0}}" Margin="0,2"/>
+                                <TextBlock Text="{Binding CurrentSystem.MachineName, StringFormat=Machine Name: {0}}" Margin="0,2"/>
+                                <TextBlock Text="{Binding CurrentSystem.IPAddress, StringFormat=IP Address: {0}}" Margin="0,2"/>
+                                <TextBlock Text="{Binding CurrentSystem.JoinType, StringFormat=Join Type: {0}}" Margin="0,2"/>
+                            </StackPanel>
+                        </Border>
                     </UniformGrid>
                 </StackPanel>
             </TabItem>
 
+            <!-- Device Control tab -->
+            <TabItem Header="Device Control">
+                <Grid Margin="10">
+                    <Grid.RowDefinitions>
+                        <RowDefinition Height="Auto"/>
+                        <RowDefinition Height="*"/>
+                    </Grid.RowDefinitions>
+
+                    <TextBlock Text="Device Control Logs"
+                               FontSize="18"
+                               FontWeight="Bold"
+                               Foreground="#0078D4"
+                               Margin="0,0,0,10"
+                               Grid.Row="0"/>
+
+                    <DataGrid ItemsSource="{Binding DeviceControlEvents}"
+                              AutoGenerateColumns="False"
+                              IsReadOnly="True"
+                              AlternatingRowBackground="#E6F0FA"
+                              RowBackground="White"
+                              FontSize="13"
+                              RowHeight="28"
+                              ScrollViewer.VerticalScrollBarVisibility="Auto"
+                              ScrollViewer.HorizontalScrollBarVisibility="Auto"
+                              Grid.Row="1">
+
+                        <DataGrid.Resources>
+                            <Style TargetType="DataGridRow">
+                                <Style.Triggers>
+                                    <DataTrigger Binding="{Binding DeniedAccess}" Value="None">
+                                        <Setter Property="Background" Value="#DFF6DD"/>
+                                        <Setter Property="Foreground" Value="Black"/>
+                                        <Setter Property="FontWeight" Value="Normal"/>
+                                    </DataTrigger>
+                                </Style.Triggers>
+                            </Style>
+                        </DataGrid.Resources>
+
+                        <DataGrid.Columns>
+                            <DataGridTextColumn Header="Time" Binding="{Binding Timestamp}" Width="150"/>
+                            <DataGridTextColumn Header="InstancePathId" Binding="{Binding InstancePathId}" Width="*"/>
+                            <DataGridTextColumn Header="VID" Binding="{Binding VID}" Width="100"/>
+                            <DataGridTextColumn Header="PID" Binding="{Binding PID}" Width="100"/>
+                            <DataGridTextColumn Header="Granted" Binding="{Binding GrantedAccess}" Width="150"/>
+                            <DataGridTextColumn Header="Denied" Binding="{Binding DeniedAccess}" Width="150"/>
+                        </DataGrid.Columns>
+                    </DataGrid>
+                </Grid>
+            </TabItem>
+
+            <!-- New Firewall Tab -->
+            <TabItem Header="Firewall">
+                <Grid Margin="10">
+                    <Grid.RowDefinitions>
+                        <RowDefinition Height="Auto"/>
+                        <RowDefinition Height="*"/>
+                    </Grid.RowDefinitions>
+
+                    <StackPanel Orientation="Horizontal" Margin="0,0,0,10">
+                        <TextBlock Text="Firewall Drops" FontSize="18" FontWeight="Bold" Foreground="#0078D4" VerticalAlignment="Center"/>
+                        <Button Content="Refresh" Click="RefreshButton_Click" Margin="20,0,0,0"
+                                Background="#0078D4" Foreground="White" Padding="6,2"/>
+                        <TextBlock Margin="20,0,0,0" VerticalAlignment="Center">
+                            <Run Text="Last Refreshed: "/>
+                            <Run Text="{Binding LastRefreshed, Mode=OneWay, StringFormat='Last refreshed: {0:G}'}"/>
+                        </TextBlock>
+
+                        <!-- Global firewall filter -->
+                        <DockPanel Margin="30,0,0,0" VerticalAlignment="Center">
+                            <TextBox x:Name="FirewallFilterBox"
+                                     Width="220"
+                                     VerticalAlignment="Center"
+                                     Text="{Binding FirewallFilterText, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}"
+                                     ToolTip="Type to filter (matches any column)"/>
+                            <Button Content="×"
+                                    Width="22"
+                                    Height="22"
+                                    Margin="4,0,0,0"
+                                    VerticalAlignment="Center"
+                                    Padding="0"
+                                    ToolTip="Clear filter"
+                                    Click="ClearFirewallFilter_Click">
+                                <Button.Style>
+                                    <Style TargetType="Button">
+                                        <Setter Property="IsEnabled" Value="True"/>
+                                        <Style.Triggers>
+                                            <DataTrigger Binding="{Binding FirewallFilterText}" Value="">
+                                                <Setter Property="IsEnabled" Value="False"/>
+                                                <Setter Property="Opacity" Value="0.4"/>
+                                            </DataTrigger>
+                                        </Style.Triggers>
+                                    </Style>
+                                </Button.Style>
+                            </Button>
+                        </DockPanel>
+                    </StackPanel>
+
+                    <DataGrid ItemsSource="{Binding FirewallView}"
+                              AutoGenerateColumns="False"
+                              IsReadOnly="True"
+                              AlternatingRowBackground="#E6F0FA"
+                              RowBackground="White"
+                              FontSize="13"
+                              RowHeight="26"
+                              Grid.Row="1"
+                              ScrollViewer.VerticalScrollBarVisibility="Auto"
+                              ScrollViewer.HorizontalScrollBarVisibility="Visible"
+                              EnableRowVirtualization="True"
+                              EnableColumnVirtualization="True">
+                        <DataGrid.Columns>
+                            <DataGridTextColumn Header="Time" Binding="{Binding Timestamp, StringFormat={}{0:yyyy-MM-dd HH:mm:ss}}" Width="170"/>
+                            <DataGridTextColumn Header="Action" Binding="{Binding Action}" Width="80"/>
+                            <DataGridTextColumn Header="Proto" Binding="{Binding Protocol}" Width="70"/>
+                            <DataGridTextColumn Header="Src IP" Binding="{Binding SourceIp}" Width="140"/>
+                            <DataGridTextColumn Header="Src Port" Binding="{Binding SourcePort}" Width="80"/>
+                            <DataGridTextColumn Header="Dst IP" Binding="{Binding DestinationIp}" Width="140"/>
+                            <DataGridTextColumn Header="Dst Port" Binding="{Binding DestinationPort}" Width="80"/>
+                            <DataGridTextColumn Header="Size" Binding="{Binding Size}" Width="70"/>
+                            <DataGridTextColumn Header="Info" Binding="{Binding Info}" Width="100"/>
+                            <DataGridTextColumn Header="PID" Binding="{Binding Pid}" Width="70"/>
+                            <DataGridTextColumn Header="Path" Binding="{Binding Path}" Width="300">
+                                <DataGridTextColumn.ElementStyle>
+                                    <Style TargetType="TextBlock">
+                                        <Setter Property="TextTrimming" Value="CharacterEllipsis"/>
+                                        <Setter Property="ToolTip" Value="{Binding Path}"/>
+                                    </Style>
+                                </DataGridTextColumn.ElementStyle>
+                            </DataGridTextColumn>
+                        </DataGrid.Columns>
+                    </DataGrid>
+                </Grid>
+            </TabItem>
+
+            <!-- Policies Tab -->
+            <TabItem Header="Policies">
+                <Grid Margin="10">
+                    <Grid.RowDefinitions>
+                        <RowDefinition Height="Auto"/>
+                        <RowDefinition Height="*"/>
+                    </Grid.RowDefinitions>
+
+                    <StackPanel Orientation="Horizontal" Margin="0,0,0,10">
+                        <TextBlock Text="Defender Policies" FontSize="18" FontWeight="Bold" Foreground="#0078D4" VerticalAlignment="Center"/>
+                        <Button Content="Refresh" Click="RefreshButton_Click" Margin="20,0,0,0"
+                                Background="#0078D4" Foreground="White" Padding="6,2"/>
+                        <TextBlock Margin="20,0,0,0" VerticalAlignment="Center">
+                            <Run Text="Last Refreshed: "/>
+                            <Run Text="{Binding LastRefreshed, Mode=OneWay, StringFormat='Last refreshed: {0:G}'}"/>
+                        </TextBlock>
+                    </StackPanel>
+
+                    <DataGrid ItemsSource="{Binding PolicyView}"
+                              AutoGenerateColumns="False"
+                              IsReadOnly="True"
+                              AlternatingRowBackground="#E6F0FA"
+                              RowBackground="White"
+                              FontSize="13"
+                              Grid.Row="1"
+                              RowHeight="28"
+                              ScrollViewer.VerticalScrollBarVisibility="Auto"
+                              ScrollViewer.HorizontalScrollBarVisibility="Auto">
+                        <DataGrid.Resources>
+                            <Style TargetType="DataGridRow">
+                                <Style.Triggers>
+                                    <DataTrigger Binding="{Binding Severity}" Value="Risk">
+                                        <Setter Property="Background" Value="MistyRose"/>
+                                        <Setter Property="FontWeight" Value="SemiBold"/>
+                                    </DataTrigger>
+                                    <DataTrigger Binding="{Binding Severity}" Value="Error">
+                                        <Setter Property="Background" Value="LightCoral"/>
+                                        <Setter Property="FontWeight" Value="Bold"/>
+                                    </DataTrigger>
+                                </Style.Triggers>
+                            </Style>
+                        </DataGrid.Resources>
+                        <DataGrid.Columns>
+                            <DataGridTextColumn Header="Friendly Name" Binding="{Binding DisplayName}" Width="200"/>
+                            <DataGridTextColumn Header="Interpreted" Binding="{Binding InterpretedValue}" Width="130"/>
+                            <DataGridTextColumn Header="Raw" Binding="{Binding RawValue}" Width="80"/>
+                            <DataGridTextColumn Header="Severity" Binding="{Binding Severity}" Width="80"/>
+                            <DataGridTextColumn Header="Description" Binding="{Binding Description}" Width="*">
+                                <DataGridTextColumn.ElementStyle>
+                                    <Style TargetType="TextBlock">
+                                        <Setter Property="TextWrapping" Value="Wrap"/>
+                                        <Setter Property="ToolTip" Value="{Binding Description}"/>
+                                    </Style>
+                                </DataGridTextColumn.ElementStyle>
+                            </DataGridTextColumn>
+                        </DataGrid.Columns>
+                    </DataGrid>
+                </Grid>
+            </TabItem>
 
             <!-- Logs Tab -->
             <TabItem Header="Logs">
-                <StackPanel Margin="5">
-                    <StackPanel Orientation="Horizontal" VerticalAlignment="Center" Margin="0,0,0,5">
-                        <TextBlock Text="Filter: " VerticalAlignment="Center" FontWeight="Bold"/>
+                <!-- Reworked layout: Grid so DataGrid gets constrained height and can scroll -->
+                <Grid Margin="10">
+                    <Grid.RowDefinitions>
+                        <RowDefinition Height="Auto"/>
+                        <RowDefinition Height="*"/>
+                    </Grid.RowDefinitions>
+
+                    <!-- Filter and Refresh Panel -->
+                    <StackPanel Orientation="Horizontal" VerticalAlignment="Center" Margin="0,0,0,10" Grid.Row="0">
+                        <TextBlock Text="Filter: " VerticalAlignment="Center" FontWeight="Bold" Foreground="#0078D4"/>
                         <ComboBox Width="120"
                                   SelectedValue="{Binding LogFilter, Mode=TwoWay}"
                                   SelectedValuePath="Content"
@@ -76,72 +285,76 @@
                             <ComboBoxItem Content="Error"/>
                             <ComboBoxItem Content="Critical"/>
                         </ComboBox>
-                        <Button Content="Refresh" Click="RefreshButton_Click" Margin="20,0,0,0"/>
+                        <Button Content="Refresh" Click="RefreshButton_Click" Margin="20,0,0,0"
+                                Background="#0078D4" Foreground="White" Padding="6,2"/>
                         <TextBlock Margin="20,0,0,0" VerticalAlignment="Center">
                             <Run Text="Last Refreshed: "/>
-                            <Run Text="{Binding LastRefreshed, StringFormat={}{0:MM/dd/yyyy HH:mm:ss}}"/>
+                            <Run Text="{Binding LastRefreshed, Mode=OneWay, StringFormat='Last refreshed: {0:G}'}"/>
                         </TextBlock>
                     </StackPanel>
 
-                    <DataGrid x:Name="LogsDataGrid"
-                              ItemsSource="{Binding LogsView}"
-                              AutoGenerateColumns="False"
-                              IsReadOnly="True"
-                              AlternatingRowBackground="#E6F0FA"
-                              RowBackground="White"
-                              GridLinesVisibility="Horizontal"
-                              CanUserResizeRows="True"
-                              ScrollViewer.VerticalScrollBarVisibility="Auto"
-                              ScrollViewer.HorizontalScrollBarVisibility="Auto"
-                              FontFamily="Segoe UI"
-                              FontSize="13"
-                              RowHeight="28">
+                    <!-- Logs DataGrid -->
+                    <Border Background="White" BorderBrush="#0078D4" BorderThickness="1" CornerRadius="5" Padding="5" Grid.Row="1">
+                        <DataGrid x:Name="LogsDataGrid"
+                                  ItemsSource="{Binding LogsView}"
+                                  AutoGenerateColumns="False"
+                                  IsReadOnly="True"
+                                  AlternatingRowBackground="#E6F0FA"
+                                  RowBackground="White"
+                                  GridLinesVisibility="Horizontal"
+                                  CanUserResizeRows="True"
+                                  ScrollViewer.VerticalScrollBarVisibility="Auto"
+                                  ScrollViewer.HorizontalScrollBarVisibility="Auto"
+                                  FontFamily="Segoe UI"
+                                  FontSize="13"
+                                  RowHeight="28">
 
-                        <DataGrid.Resources>
-                            <Style TargetType="DataGridRow">
-                                <Style.Triggers>
-                                    <!-- Error row -->
-                                    <DataTrigger Binding="{Binding Level}" Value="Error">
-                                        <Setter Property="Background" Value="LightCoral"/>
-                                        <Setter Property="Foreground" Value="Black"/>
-                                        <Setter Property="FontWeight" Value="Bold"/>
-                                    </DataTrigger>
-                                    <!-- Critical row -->
-                                    <DataTrigger Binding="{Binding Level}" Value="Critical">
-                                        <Setter Property="Background" Value="Tomato"/>
-                                        <Setter Property="Foreground" Value="White"/>
-                                        <Setter Property="FontWeight" Value="Bold"/>
-                                    </DataTrigger>
-                                    <!-- Warning row -->
-                                    <DataTrigger Binding="{Binding Level}" Value="Warning">
-                                        <Setter Property="Background" Value="Khaki"/>
-                                        <Setter Property="Foreground" Value="Black"/>
-                                        <Setter Property="FontWeight" Value="SemiBold"/>
-                                    </DataTrigger>
-                                    <!-- Info row (optional) -->
-                                    <DataTrigger Binding="{Binding Level}" Value="Info">
-                                        <Setter Property="Background" Value="White"/>
-                                        <Setter Property="Foreground" Value="Black"/>
-                                    </DataTrigger>
-                                </Style.Triggers>
-                            </Style>
-                        </DataGrid.Resources>
+                            <DataGrid.Resources>
+                                <Style TargetType="DataGridRow">
+                                    <Style.Triggers>
+                                        <DataTrigger Binding="{Binding Level}" Value="Error">
+                                            <Setter Property="Background" Value="LightCoral"/>
+                                            <Setter Property="Foreground" Value="Black"/>
+                                            <Setter Property="FontWeight" Value="Bold"/>
+                                        </DataTrigger>
+                                        <DataTrigger Binding="{Binding Level}" Value="Critical">
+                                            <Setter Property="Background" Value="Tomato"/>
+                                            <Setter Property="Foreground" Value="White"/>
+                                            <Setter Property="FontWeight" Value="Bold"/>
+                                        </DataTrigger>
+                                        <DataTrigger Binding="{Binding Level}" Value="Warning">
+                                            <Setter Property="Background" Value="Khaki"/>
+                                            <Setter Property="Foreground" Value="Black"/>
+                                            <Setter Property="FontWeight" Value="SemiBold"/>
+                                        </DataTrigger>
+                                        <DataTrigger Binding="{Binding Level}" Value="Info">
+                                            <Setter Property="Background" Value="White"/>
+                                            <Setter Property="Foreground" Value="Black"/>
+                                        </DataTrigger>
+                                    </Style.Triggers>
+                                </Style>
+                            </DataGrid.Resources>
 
-                        <DataGrid.Columns>
-                            <DataGridTextColumn Header="Time" Binding="{Binding Time, StringFormat={}{0:MM/dd/yyyy HH:mm:ss}}" Width="180"/>
-                            <DataGridTextColumn Header="Level" Binding="{Binding Level}" Width="120"/>
-                            <DataGridTextColumn Header="Message" Binding="{Binding Message}" Width="*">
-                                <DataGridTextColumn.ElementStyle>
-                                    <Style TargetType="TextBlock">
-                                        <Setter Property="TextTrimming" Value="CharacterEllipsis"/>
-                                        <Setter Property="ToolTip" Value="{Binding Message}"/>
-                                    </Style>
-                                </DataGridTextColumn.ElementStyle>
-                            </DataGridTextColumn>
-                        </DataGrid.Columns>
-                    </DataGrid>
-                </StackPanel>
+                            <DataGrid.Columns>
+                                <DataGridTextColumn Header="Time" Binding="{Binding Time, StringFormat={}{0:MM/dd/yyyy HH:mm:ss}}" Width="180"/>
+                                <DataGridTextColumn Header="Level" Binding="{Binding Level}" Width="120"/>
+                                <DataGridTextColumn Header="Message" Binding="{Binding Message}" Width="*">
+                                    <DataGridTextColumn.ElementStyle>
+                                        <Style TargetType="TextBlock">
+                                            <Setter Property="TextTrimming" Value="CharacterEllipsis"/>
+                                            <Setter Property="ToolTip" Value="{Binding Message}"/>
+                                            <Setter Property="TextWrapping" Value="Wrap"/>
+                                        </Style>
+                                    </DataGridTextColumn.ElementStyle>
+                                </DataGridTextColumn>
+                            </DataGrid.Columns>
+                        </DataGrid>
+                    </Border>
+                </Grid>
             </TabItem>
+
+
+
         </TabControl>
     </Grid>
 </Window>

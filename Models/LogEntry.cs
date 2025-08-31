@@ -1,16 +1,12 @@
 ﻿using System;
-using System.Collections.Generic;
-using System.Linq;
-using System.Text;
-using System.Threading.Tasks;
 
-namespace MDEMonitor.Models
+namespace MDE_Monitoring_App.Models
 {
     public class LogEntry
     {
         public DateTime Time { get; set; }
-        public required string Level { get; set; }
-        public required string Message { get; set; }
+        public string Level { get; set; } = string.Empty;
+        public string Message { get; set; } = string.Empty;
     }
 }
 

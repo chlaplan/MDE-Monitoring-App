@@ -1,28 +1,32 @@
-﻿using MDEMonitor.Models;
-using System.Management;
+﻿using System.Management;
+using MDE_Monitoring_App.Models;
 
-namespace MDEMonitor.Services
+namespace MDE_Monitoring_App.Services
 {
+    // WMI-based enrichment of live Defender status
     public class DefenderStatusService
     {
         public DefenderStatus GetStatus()
         {
             var status = new DefenderStatus();
-
             try
             {
-                using var searcher = new ManagementObjectSearcher(@"root\Microsoft\Windows\Defender",
+                using var searcher = new ManagementObjectSearcher(
+                    @"root\Microsoft\Windows\Defender",
                     "SELECT * FROM MSFT_MpComputerStatus");
-                foreach (ManagementObject queryObj in searcher.Get())
+
+                foreach (ManagementObject mo in searcher.Get())
                 {
-                    status.AMProductVersion = queryObj["AMProductVersion"]?.ToString() ?? "Unknown";
-                    status.AMEngineVersion = queryObj["AMEngineVersion"]?.ToString() ?? "Unknown";
-                    status.AMRunningMode = queryObj["AMRunningMode"]?.ToString() ?? "Unknown";
-                    status.RealTimeProtection = (bool)(queryObj["RealTimeProtectionEnabled"] ?? false) ? "On" : "Off";
-                    status.AntivirusSignatureAge = queryObj["AntivirusSignatureAge"]?.ToString() + " days";
-                    status.AntispywareSignatureAge = queryObj["AntispywareSignatureAge"]?.ToString() + " days";
-                    status.DeviceControlDefaultEnforcement = queryObj["DeviceControlDefaultEnforcement"]?.ToString() ?? "Unknown";
-                    status.DeviceControlState = queryObj["DeviceControlState"]?.ToString() ?? "Unknown";
+                    status.AMProductVersion = mo["AMProductVersion"]?.ToString() ?? status.AMProductVersion;
+                    status.AMEngineVersion = mo["AMEngineVersion"]?.ToString() ?? status.AMEngineVersion;
+                    status.AMRunningMode = mo["AMRunningMode"]?.ToString() ?? status.AMRunningMode;
+                    status.RealTimeProtection = (bool)(mo["RealTimeProtectionEnabled"] ?? false) ? "On" : "Off";
+                    status.AntivirusSignatureAge = (mo["AntivirusSignatureAge"]?.ToString() ?? "0") + " days";
+                    status.AntispywareSignatureAge = (mo["AntispywareSignatureAge"]?.ToString() ?? "0") + " days";
+                    status.DeviceControlDefaultEnforcement = mo["DeviceControlDefaultEnforcement"]?.ToString()
+                                                             ?? status.DeviceControlDefaultEnforcement;
+                    status.DeviceControlState = mo["DeviceControlState"]?.ToString() ?? status.DeviceControlState;
+                    break;
                 }
             }
             catch
@@ -36,7 +40,6 @@ namespace MDEMonitor.Services
                 status.DeviceControlDefaultEnforcement = "Error";
                 status.DeviceControlState = "Error";
             }
-
             return status;
         }
     }

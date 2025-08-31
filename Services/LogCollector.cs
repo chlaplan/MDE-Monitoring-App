@@ -1,43 +1,60 @@
 ﻿using System;
 using System.Collections.ObjectModel;
 using System.Diagnostics.Eventing.Reader;
-using MDEMonitor.Models;
+using MDE_Monitoring_App.Models;
 
-namespace MDEMonitor.Services
+namespace MDE_Monitoring_App.Services
 {
     public class LogCollector
     {
         public ObservableCollection<LogEntry> GetDefenderLogs(int max = 400)
         {
-            var logs = new ObservableCollection<LogEntry>();
+            var output = new ObservableCollection<LogEntry>();
 
-            var query = new EventLogQuery("Microsoft-Windows-Windows Defender/Operational", PathType.LogName,
-                "*[System/Provider/@Name='Microsoft-Windows-Windows Defender']");
-            query.ReverseDirection = true; // newest first
-
-            using var reader = new EventLogReader(query);
-            EventRecord rec;
-            while ((rec = reader.ReadEvent()) != null && logs.Count < max)
+            var query = new EventLogQuery(
+                "Microsoft-Windows-Windows Defender/Operational",
+                PathType.LogName,
+                "*[System/Provider/@Name='Microsoft-Windows-Windows Defender']"
+            )
             {
-                var level = rec.Level switch
-                {
-                    1 => "Critical",
-                    2 => "Error",
-                    3 => "Warning",
-                    4 => "Info",
-                    5 => "Verbose",
-                    _ => rec.LevelDisplayName ?? "Info"
-                };
+                ReverseDirection = true
+            };
 
-                logs.Add(new LogEntry
+            try
+            {
+                using var reader = new EventLogReader(query);
+                EventRecord? rec;
+                while ((rec = reader.ReadEvent()) != null && output.Count < max)
                 {
-                    Time = rec.TimeCreated ?? DateTime.Now,
-                    Level = level,
-                    Message = rec.FormatDescription() ?? string.Empty
+                    var level = rec.Level switch
+                    {
+                        1 => "Critical",
+                        2 => "Error",
+                        3 => "Warning",
+                        4 => "Info",
+                        5 => "Verbose",
+                        _ => rec.LevelDisplayName ?? "Info"
+                    };
+
+                    output.Add(new LogEntry
+                    {
+                        Time = rec.TimeCreated ?? DateTime.Now,
+                        Level = level,
+                        Message = rec.FormatDescription() ?? string.Empty
+                    });
+                }
+            }
+            catch
+            {
+                output.Add(new LogEntry
+                {
+                    Time = DateTime.Now,
+                    Level = "Error",
+                    Message = "Failed to read Defender Operational log."
                 });
             }
 
-            return logs;
+            return output;
         }
     }
 }
