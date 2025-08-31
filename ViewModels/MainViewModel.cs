@@ -16,7 +16,9 @@ namespace MDE_Monitoring_App
         private readonly DefenderStatusService _defenderStatusService = new();
         private readonly LogCollector _logCollector = new();
         private readonly FirewallLogService _firewallLogService = new();
-        private readonly DefenderPolicyService _policyService = new(); // NEW
+        private readonly DefenderPolicyService _policyService = new();
+        private readonly LatestDefenderVersionService _latestVersionService = new();
+        private readonly IntuneSyncService _intuneSyncService = new();
 
         public ObservableCollection<LogEntry> Logs { get; } = new();
         private ObservableCollection<DeviceControlEvent> _deviceControlEvents = new();
@@ -27,13 +29,13 @@ namespace MDE_Monitoring_App
         }
 
         public ObservableCollection<FirewallLogEntry> FirewallEvents { get; } = new();
-        public ObservableCollection<PolicySetting> DefenderPolicies { get; } = new(); // NEW
+        public ObservableCollection<PolicySetting> DefenderPolicies { get; } = new();
 
         public ICollectionView LogsView { get; }
         public ICollectionView FirewallView { get; }
-        public ICollectionView PolicyView { get; }  // optional view (for later filtering)
+        public ICollectionView PolicyView { get; }
         public DefenderStatus DefenderStatus { get; } = new();
-        public MDE_Monitoring_App.Models.SystemInfo CurrentSystem { get; } = new();
+        public Models.SystemInfo CurrentSystem { get; } = new();
 
         private DateTime _lastRefreshed;
         public DateTime LastRefreshed
@@ -66,7 +68,6 @@ namespace MDE_Monitoring_App
             }
         }
 
-        // Single global firewall filter text
         private string _firewallFilterText = string.Empty;
         public string FirewallFilterText
         {
@@ -82,6 +83,98 @@ namespace MDE_Monitoring_App
             }
         }
 
+        private LatestDefenderVersions? _latestVersions;
+        public LatestDefenderVersions? LatestVersions
+        {
+            get => _latestVersions;
+            private set
+            {
+                if (_latestVersions != value)
+                {
+                    _latestVersions = value;
+                    OnPropertyChanged();
+                    RaiseVersionProps();
+                }
+            }
+        }
+
+        // Backing fields & public (safe) writable properties
+        private string _platformStatusText = "Unknown";
+        private string _engineStatusText = "Unknown";
+
+        public string PlatformStatusText
+        {
+            get => _platformStatusText;
+            set
+            {
+                // Ignore external TwoWay writes; recompute to maintain consistency
+                var computed = BuildStatusText(DefenderStatus.AMProductVersion, LatestVersions?.PlatformVersion, PlatformUpToDate);
+                if (_platformStatusText != computed)
+                {
+                    _platformStatusText = computed;
+                    OnPropertyChanged();
+                }
+            }
+        }
+
+        public string EngineStatusText
+        {
+            get => _engineStatusText;
+            set
+            {
+                var computed = BuildStatusText(DefenderStatus.AMEngineVersion, LatestVersions?.EngineVersion, EngineUpToDate);
+                if (_engineStatusText != computed)
+                {
+                    _engineStatusText = computed;
+                    OnPropertyChanged();
+                }
+            }
+        }
+
+        // Computed health booleans (kept for triggers / other logic)
+        public bool PlatformUpToDate => IsUpToDate(DefenderStatus.AMProductVersion, LatestVersions?.PlatformVersion);
+        public bool EngineUpToDate => IsUpToDate(DefenderStatus.AMEngineVersion, LatestVersions?.EngineVersion);
+
+        private void RaiseVersionProps()
+        {
+            // Recompute text first
+            var newPlat = BuildStatusText(DefenderStatus.AMProductVersion, LatestVersions?.PlatformVersion, PlatformUpToDate);
+            var newEng  = BuildStatusText(DefenderStatus.AMEngineVersion,   LatestVersions?.EngineVersion,   EngineUpToDate);
+
+            if (_platformStatusText != newPlat)
+            {
+                _platformStatusText = newPlat;
+                OnPropertyChanged(nameof(PlatformStatusText));
+            }
+            if (_engineStatusText != newEng)
+            {
+                _engineStatusText = newEng;
+                OnPropertyChanged(nameof(EngineStatusText));
+            }
+
+            OnPropertyChanged(nameof(PlatformUpToDate));
+            OnPropertyChanged(nameof(EngineUpToDate));
+        }
+
+        private static bool IsUpToDate(string? local, string? latest)
+        {
+            if (string.IsNullOrWhiteSpace(local) || string.IsNullOrWhiteSpace(latest)) return true; // treat unknown latest as neutral (won't show red)
+            if (!Version.TryParse(Normalize(local), out var lv)) return true;
+            if (!Version.TryParse(Normalize(latest), out var rv)) return true;
+            return lv >= rv;
+        }
+
+        private static string BuildStatusText(string? local, string? latest, bool upToDate)
+        {
+            if (string.IsNullOrWhiteSpace(local)) return "Unknown";
+            if (latest == null || latest.Length == 0)
+                return local + " (Unavailable)"; // failed or not parsed
+            if (upToDate) return $"{local} (Up to date)";
+            return $"{local} (Out of date → Latest {latest})";
+        }
+
+        private static string Normalize(string v) => v.Trim();
+
         public MainViewModel()
         {
             LogsView = CollectionViewSource.GetDefaultView(Logs);
@@ -92,7 +185,18 @@ namespace MDE_Monitoring_App
 
             PolicyView = CollectionViewSource.GetDefaultView(DefenderPolicies);
 
+            DefenderStatus.PropertyChanged += DefenderStatusOnPropertyChanged;
+
             _ = RefreshDataAsync();
+        }
+
+        private void DefenderStatusOnPropertyChanged(object? sender, PropertyChangedEventArgs e)
+        {
+            if (e.PropertyName == nameof(DefenderStatus.AMProductVersion) ||
+                e.PropertyName == nameof(DefenderStatus.AMEngineVersion))
+            {
+                RaiseVersionProps();
+            }
         }
 
         private bool LogFilterPredicate(object obj)
@@ -123,25 +227,84 @@ namespace MDE_Monitoring_App
                 (e.Pid?.ToString()?.Contains(term, cmp) ?? false);
         }
 
+        private LatestFetchState _latestFetchState = LatestFetchState.Pending;
+        public LatestFetchState LatestFetchState
+        {
+            get => _latestFetchState;
+            private set
+            {
+                if (_latestFetchState != value)
+                {
+                    _latestFetchState = value;
+                    OnPropertyChanged();
+                    // Recompute text if state affects wording
+                    RaiseVersionProps();
+                }
+            }
+        }
+
+        private string? _latestFetchError;
+        public string? LatestFetchError
+        {
+            get => _latestFetchError;
+            private set { if (_latestFetchError != value) { _latestFetchError = value; OnPropertyChanged(); } }
+        }
+
+        private DateTime? _intuneLastSyncUtc;
+        public DateTime? IntuneLastSyncUtc
+        {
+            get => _intuneLastSyncUtc;
+            private set
+            {
+                if (_intuneLastSyncUtc != value)
+                {
+                    _intuneLastSyncUtc = value;
+                    OnPropertyChanged();
+                    OnPropertyChanged(nameof(IntuneLastSyncLocalDisplay));
+                    OnPropertyChanged(nameof(IntuneLastSyncUtcDisplay));
+                }
+            }
+        }
+
+        public string IntuneLastSyncLocalDisplay
+        {
+            get => _intuneLastSyncUtc.HasValue ? _intuneLastSyncUtc.Value.ToLocalTime().ToString("G") : "Unknown";
+            set { /* ignore incoming writes to keep read-only semantics */ }
+        }
+
+        public string IntuneLastSyncUtcDisplay
+        {
+            get => _intuneLastSyncUtc.HasValue ? _intuneLastSyncUtc.Value.ToString("u") : "Unknown";
+            set { /* ignore */ }
+        }
+
         public async Task RefreshDataAsync()
         {
             try
             {
+                // Replace this line:
+                // var dcTask = Task.Run(DeviceControlService.LoadLatestDeviceControlEvents);
+
+                // With this line:
                 var dcTask = Task.Run(() => DeviceControlService.LoadLatestDeviceControlEvents());
                 var logsTask = Task.Run(() => _logCollector.GetDefenderLogs(50));
-                var statusTask = Task.Run(() => _defenderStatusService.GetStatus());
+                var statusTask = Task.Run(_defenderStatusService.GetStatus);
                 var firewallTask = Task.Run(() => _firewallLogService.LoadRecentDrops(200));
-                var policyTask = Task.Run(() => _policyService.LoadPolicies()); // NEW
+                var policyTask = Task.Run(_policyService.LoadPolicies);
+                var latestTask = _latestVersionService.GetLatestAsync();
+                var intuneSyncTask = Task.Run(_intuneSyncService.GetLastSync);
 
                 var dcEvents = await dcTask.ConfigureAwait(false);
                 var newLogs = await logsTask.ConfigureAwait(false);
                 var newStatus = await statusTask.ConfigureAwait(false);
                 var fwEvents = await firewallTask.ConfigureAwait(false);
-                var policies = await policyTask.ConfigureAwait(false); // NEW
+                var policies = await policyTask.ConfigureAwait(false);
+                var latest = await latestTask.ConfigureAwait(false);
+                var intuneLastSync = await intuneSyncTask.ConfigureAwait(false);
 
                 App.Current.Dispatcher.Invoke(() =>
                 {
-                    DeviceControlEvents = new ObservableCollection<DeviceControlEvent>(dcEvents);
+                    DeviceControlEvents = new(dcEvents);
 
                     Logs.Clear();
                     foreach (var l in newLogs) Logs.Add(l);
@@ -167,6 +330,12 @@ namespace MDE_Monitoring_App
                     CurrentSystem.MachineName = Environment.MachineName;
                     CurrentSystem.IPAddress = GetLocalIPAddress();
                     CurrentSystem.JoinType = GetAADJoinType();
+
+                    // With the following, using the correct variable names:
+                    LatestVersions = latest.versions;
+                    LatestFetchState = latest.state;
+                    LatestFetchError = latest.error;
+                    IntuneLastSyncUtc = intuneLastSync;
 
                     LastRefreshed = DateTime.Now;
                     LogsView.Refresh();

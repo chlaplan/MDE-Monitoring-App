@@ -34,57 +34,127 @@
                         </TextBlock>
                     </StackPanel>
 
-                    <UniformGrid Columns="2" Rows="1" Margin="0,10,0,0" HorizontalAlignment="Stretch" VerticalAlignment="Top">
-                        <!-- Product Info Card -->
-                        <Border Background="White" BorderBrush="#0078D4" BorderThickness="1" CornerRadius="5" Padding="15" Margin="5" >
+                    <!-- Info and Status Grid -->
+                    <Grid Margin="0,10,0,0">
+                        <Grid.RowDefinitions>
+                            <RowDefinition Height="*"/>
+                            <RowDefinition Height="*"/>
+                        </Grid.RowDefinitions>
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="*"/>
+                            <ColumnDefinition Width="*"/>
+                        </Grid.ColumnDefinitions>
+
+                        <!-- Product Info -->
+                        <Border Grid.Row="0" Grid.Column="0"
+                                Background="White" BorderBrush="#0078D4" BorderThickness="1"
+                                CornerRadius="5" Padding="15" Margin="5">
                             <StackPanel>
                                 <TextBlock Text="Product Info" FontWeight="Bold" FontSize="16" Foreground="#0078D4" Margin="0,0,0,10"/>
-                                <TextBlock Text="{Binding DefenderStatus.AMProductVersion, StringFormat=Product Version: {0}}" Margin="0,2"/>
-                                <TextBlock Text="{Binding DefenderStatus.AMEngineVersion, StringFormat=Engine Version: {0}}" Margin="0,2"/>
-                                <TextBlock Text="{Binding DefenderStatus.AMRunningMode, StringFormat=Running Mode: {0}}" Margin="0,2"/>
+
+                                <TextBlock Margin="0,2,0,0">
+                                    <Run Text="Platform Version: "/>
+                                    <Run Text="{Binding PlatformStatusText, Mode=OneWay}">
+                                        <Run.Style>
+                                            <Style TargetType="Run">
+                                                <Setter Property="Foreground" Value="Gray"/>
+                                                <Style.Triggers>
+                                                    <DataTrigger Binding="{Binding PlatformUpToDate}" Value="True">
+                                                        <Setter Property="Foreground" Value="#1E7D24"/>
+                                                    </DataTrigger>
+                                                    <DataTrigger Binding="{Binding PlatformUpToDate}" Value="False">
+                                                        <Setter Property="Foreground" Value="Red"/>
+                                                    </DataTrigger>
+                                                </Style.Triggers>
+                                            </Style>
+                                        </Run.Style>
+                                    </Run>
+                                </TextBlock>
+
+                                <TextBlock Margin="0,2,0,0">
+                                    <Run Text="Engine Version: "/>
+                                    <Run Text="{Binding EngineStatusText, Mode=OneWay}">
+                                        <Run.Style>
+                                            <Style TargetType="Run">
+                                                <Setter Property="Foreground" Value="Gray"/>
+                                                <Style.Triggers>
+                                                    <DataTrigger Binding="{Binding EngineUpToDate}" Value="True">
+                                                        <Setter Property="Foreground" Value="#1E7D24"/>
+                                                    </DataTrigger>
+                                                    <DataTrigger Binding="{Binding EngineUpToDate}" Value="False">
+                                                        <Setter Property="Foreground" Value="Red"/>
+                                                    </DataTrigger>
+                                                </Style.Triggers>
+                                            </Style>
+                                        </Run.Style>
+                                    </Run>
+                                </TextBlock>
+
+                                <TextBlock Text="{Binding DefenderStatus.AMRunningMode, StringFormat=Running Mode: {0}}" Margin="0,6,0,0"/>
                             </StackPanel>
                         </Border>
 
-                        <!-- Protection Status Card -->
-                        <Border Background="White" BorderBrush="#0078D4" BorderThickness="1" CornerRadius="5" Padding="15" Margin="5">
+                        <!-- Protection Status -->
+                        <Border Grid.Row="0" Grid.Column="1"
+                                Background="White" BorderBrush="#0078D4" BorderThickness="1"
+                                CornerRadius="5" Padding="15" Margin="5">
                             <StackPanel>
                                 <TextBlock Text="Protection Status" FontWeight="Bold" FontSize="16" Foreground="#0078D4" Margin="0,0,0,10"/>
-                                <TextBlock Text="{Binding DefenderStatus.RealTimeProtection, StringFormat=Real-Time Protection: {0}}" Margin="0,2"/>
-                                <TextBlock Text="{Binding DefenderStatus.AntivirusSignatureAge, StringFormat=Antivirus Signature Age: {0}}" Margin="0,2"/>
-                                <TextBlock Text="{Binding DefenderStatus.AntispywareSignatureAge, StringFormat=Antispyware Signature Age: {0}}" Margin="0,2"/>
-                                <TextBlock Text="{Binding DefenderStatus.DeviceControlDefaultEnforcement, StringFormat=Device Control Enforcement: {0}}" Margin="0,2"/>
-                                <TextBlock Text="{Binding DefenderStatus.DeviceControlState, StringFormat=Device Control State: {0}}" Margin="0,2"/>
+                                <TextBlock Text="{Binding DefenderStatus.RealTimeProtection, StringFormat=Real-Time Protection: {0}}" Margin="0,2,0,0"/>
+                                <TextBlock Text="{Binding DefenderStatus.AntivirusSignatureAge, StringFormat=Antivirus Signature Age: {0}}" Margin="0,2,0,0"/>
+                                <TextBlock Text="{Binding DefenderStatus.AntispywareSignatureAge, StringFormat=Antispyware Signature Age: {0}}" Margin="0,2,0,0"/>
+                                <TextBlock Text="{Binding DefenderStatus.DeviceControlDefaultEnforcement, StringFormat=Device Control Enforcement: {0}}" Margin="0,2,0,0"/>
+                                <TextBlock Text="{Binding DefenderStatus.DeviceControlState, StringFormat=Device Control State: {0}}" Margin="0,2,0,0"/>
                             </StackPanel>
                         </Border>
-                        <!-- System Info Card -->
-                        <Border Background="White" BorderBrush="#0078D4" BorderThickness="1" CornerRadius="5" Padding="15" Margin="5">
+
+                        <!-- System Info -->
+                        <Border Grid.Row="1" Grid.Column="0"
+                                Background="White" BorderBrush="#0078D4" BorderThickness="1"
+                                CornerRadius="5" Padding="15" Margin="5">
                             <StackPanel>
                                 <TextBlock Text="System Info" FontWeight="Bold" FontSize="16" Foreground="#0078D4" Margin="0,0,0,10"/>
-                                <TextBlock Text="{Binding CurrentSystem.CurrentUser, StringFormat=Current User: {0}}" Margin="0,2"/>
-                                <TextBlock Text="{Binding CurrentSystem.MachineName, StringFormat=Machine Name: {0}}" Margin="0,2"/>
-                                <TextBlock Text="{Binding CurrentSystem.IPAddress, StringFormat=IP Address: {0}}" Margin="0,2"/>
-                                <TextBlock Text="{Binding CurrentSystem.JoinType, StringFormat=Join Type: {0}}" Margin="0,2"/>
+                                <TextBlock Text="{Binding CurrentSystem.CurrentUser, StringFormat=Current User: {0}}" Margin="0,2,0,0"/>
+                                <TextBlock Text="{Binding CurrentSystem.MachineName, StringFormat=Machine Name: {0}}" Margin="0,2,0,0"/>
+                                <TextBlock Text="{Binding CurrentSystem.IPAddress, StringFormat=IP Address: {0}}" Margin="0,2,0,0"/>
+                                <TextBlock Text="{Binding CurrentSystem.JoinType, StringFormat=Join Type: {0}}" Margin="0,2,0,0"/>
                             </StackPanel>
                         </Border>
-                    </UniformGrid>
+
+                        <!-- Intune / Entra Management -->
+                        <Border Grid.Row="1" Grid.Column="1"
+                                Background="White" BorderBrush="#0078D4" BorderThickness="1"
+                                CornerRadius="5" Padding="15" Margin="5">
+                            <StackPanel>
+                                <TextBlock Text="Intune / Entra Management" FontWeight="Bold" FontSize="16" Foreground="#0078D4" Margin="0,0,0,10"/>
+                                <TextBlock Margin="0,2,0,0">
+                                    <Run Text="Last Sync (Local): "/>
+                                    <Run Text="{Binding IntuneLastSyncLocalDisplay, Mode=OneWay}"/>
+                                </TextBlock>
+                                <TextBlock Margin="0,2,0,0">
+                                    <Run Text="Last Sync (UTC): "/>
+                                    <Run Text="{Binding IntuneLastSyncUtcDisplay, Mode=OneWay}"/>
+                                </TextBlock>
+                            </StackPanel>
+                        </Border>
+                    </Grid>
                 </StackPanel>
             </TabItem>
 
             <!-- Device Control tab -->
             <TabItem Header="Device Control">
+                <!-- unchanged -->
                 <Grid Margin="10">
                     <Grid.RowDefinitions>
                         <RowDefinition Height="Auto"/>
                         <RowDefinition Height="*"/>
                     </Grid.RowDefinitions>
-
                     <TextBlock Text="Device Control Logs"
                                FontSize="18"
                                FontWeight="Bold"
                                Foreground="#0078D4"
                                Margin="0,0,0,10"
                                Grid.Row="0"/>
-
                     <DataGrid ItemsSource="{Binding DeviceControlEvents}"
                               AutoGenerateColumns="False"
                               IsReadOnly="True"
@@ -95,7 +165,6 @@
                               ScrollViewer.VerticalScrollBarVisibility="Auto"
                               ScrollViewer.HorizontalScrollBarVisibility="Auto"
                               Grid.Row="1">
-
                         <DataGrid.Resources>
                             <Style TargetType="DataGridRow">
                                 <Style.Triggers>
@@ -107,7 +176,6 @@
                                 </Style.Triggers>
                             </Style>
                         </DataGrid.Resources>
-
                         <DataGrid.Columns>
                             <DataGridTextColumn Header="Time" Binding="{Binding Timestamp}" Width="150"/>
                             <DataGridTextColumn Header="InstancePathId" Binding="{Binding InstancePathId}" Width="*"/>
@@ -120,14 +188,14 @@
                 </Grid>
             </TabItem>
 
-            <!-- New Firewall Tab -->
+            <!-- Firewall Tab -->
             <TabItem Header="Firewall">
+                <!-- unchanged -->
                 <Grid Margin="10">
                     <Grid.RowDefinitions>
                         <RowDefinition Height="Auto"/>
                         <RowDefinition Height="*"/>
                     </Grid.RowDefinitions>
-
                     <StackPanel Orientation="Horizontal" Margin="0,0,0,10">
                         <TextBlock Text="Firewall Drops" FontSize="18" FontWeight="Bold" Foreground="#0078D4" VerticalAlignment="Center"/>
                         <Button Content="Refresh" Click="RefreshButton_Click" Margin="20,0,0,0"
@@ -136,8 +204,6 @@
                             <Run Text="Last Refreshed: "/>
                             <Run Text="{Binding LastRefreshed, Mode=OneWay, StringFormat='Last refreshed: {0:G}'}"/>
                         </TextBlock>
-
-                        <!-- Global firewall filter -->
                         <DockPanel Margin="30,0,0,0" VerticalAlignment="Center">
                             <TextBox x:Name="FirewallFilterBox"
                                      Width="220"
@@ -166,7 +232,6 @@
                             </Button>
                         </DockPanel>
                     </StackPanel>
-
                     <DataGrid ItemsSource="{Binding FirewallView}"
                               AutoGenerateColumns="False"
                               IsReadOnly="True"
@@ -205,12 +270,12 @@
 
             <!-- Policies Tab -->
             <TabItem Header="Policies">
+                <!-- unchanged -->
                 <Grid Margin="10">
                     <Grid.RowDefinitions>
                         <RowDefinition Height="Auto"/>
                         <RowDefinition Height="*"/>
                     </Grid.RowDefinitions>
-
                     <StackPanel Orientation="Horizontal" Margin="0,0,0,10">
                         <TextBlock Text="Defender Policies" FontSize="18" FontWeight="Bold" Foreground="#0078D4" VerticalAlignment="Center"/>
                         <Button Content="Refresh" Click="RefreshButton_Click" Margin="20,0,0,0"
@@ -220,7 +285,6 @@
                             <Run Text="{Binding LastRefreshed, Mode=OneWay, StringFormat='Last refreshed: {0:G}'}"/>
                         </TextBlock>
                     </StackPanel>
-
                     <DataGrid ItemsSource="{Binding PolicyView}"
                               AutoGenerateColumns="False"
                               IsReadOnly="True"
@@ -265,14 +329,12 @@
 
             <!-- Logs Tab -->
             <TabItem Header="Logs">
-                <!-- Reworked layout: Grid so DataGrid gets constrained height and can scroll -->
+                <!-- unchanged -->
                 <Grid Margin="10">
                     <Grid.RowDefinitions>
                         <RowDefinition Height="Auto"/>
                         <RowDefinition Height="*"/>
                     </Grid.RowDefinitions>
-
-                    <!-- Filter and Refresh Panel -->
                     <StackPanel Orientation="Horizontal" VerticalAlignment="Center" Margin="0,0,0,10" Grid.Row="0">
                         <TextBlock Text="Filter: " VerticalAlignment="Center" FontWeight="Bold" Foreground="#0078D4"/>
                         <ComboBox Width="120"
@@ -292,8 +354,6 @@
                             <Run Text="{Binding LastRefreshed, Mode=OneWay, StringFormat='Last refreshed: {0:G}'}"/>
                         </TextBlock>
                     </StackPanel>
-
-                    <!-- Logs DataGrid -->
                     <Border Background="White" BorderBrush="#0078D4" BorderThickness="1" CornerRadius="5" Padding="5" Grid.Row="1">
                         <DataGrid x:Name="LogsDataGrid"
                                   ItemsSource="{Binding LogsView}"
@@ -308,7 +368,6 @@
                                   FontFamily="Segoe UI"
                                   FontSize="13"
                                   RowHeight="28">
-
                             <DataGrid.Resources>
                                 <Style TargetType="DataGridRow">
                                     <Style.Triggers>
@@ -334,7 +393,6 @@
                                     </Style.Triggers>
                                 </Style>
                             </DataGrid.Resources>
-
                             <DataGrid.Columns>
                                 <DataGridTextColumn Header="Time" Binding="{Binding Time, StringFormat={}{0:MM/dd/yyyy HH:mm:ss}}" Width="180"/>
                                 <DataGridTextColumn Header="Level" Binding="{Binding Level}" Width="120"/>
@@ -352,9 +410,6 @@
                     </Border>
                 </Grid>
             </TabItem>
-
-
-
         </TabControl>
     </Grid>
 </Window>
