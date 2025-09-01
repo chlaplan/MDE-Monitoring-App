@@ -8,6 +8,8 @@ using System.Threading.Tasks;
 using System.Windows.Data;
 using MDE_Monitoring_App.Models;
 using MDE_Monitoring_App.Services;
+using System.IO;
+using System.Threading;
 
 namespace MDE_Monitoring_App
 {
@@ -19,6 +21,9 @@ namespace MDE_Monitoring_App
         private readonly DefenderPolicyService _policyService = new();
         private readonly LatestDefenderVersionService _latestVersionService = new();
         private readonly IntuneSyncService _intuneSyncService = new();
+        private readonly AppControlStatusService _appControlStatusService = new();
+        private readonly AppControlLogService _appControlLogService = new();
+        private readonly DeviceGuardStatusService _deviceGuardStatusService = new();
 
         public ObservableCollection<LogEntry> Logs { get; } = new();
         private ObservableCollection<DeviceControlEvent> _deviceControlEvents = new();
@@ -30,6 +35,7 @@ namespace MDE_Monitoring_App
 
         public ObservableCollection<FirewallLogEntry> FirewallEvents { get; } = new();
         public ObservableCollection<PolicySetting> DefenderPolicies { get; } = new();
+        public ObservableCollection<AppControlEvent> AppControlEvents { get; } = new();
 
         public ICollectionView LogsView { get; }
         public ICollectionView FirewallView { get; }
@@ -278,6 +284,40 @@ namespace MDE_Monitoring_App
             set { /* ignore */ }
         }
 
+        private DeviceGuardStatus _deviceGuardStatus = new();
+        public DeviceGuardStatus DeviceGuardStatus
+        {
+            get => _deviceGuardStatus;
+            private set
+            {
+                _deviceGuardStatus = value;
+                OnPropertyChanged();
+                OnPropertyChanged(nameof(CodeIntegrityPolicyDisplay));
+                OnPropertyChanged(nameof(VbsStatusDisplay));
+                OnPropertyChanged(nameof(SecurityServicesConfiguredDisplay));
+                OnPropertyChanged(nameof(SecurityServicesRunningDisplay));
+            }
+        }
+
+        public string CodeIntegrityPolicyDisplay => "Code Integrity Policy: " + DeviceGuardStatus.CodeIntegrityPolicyDisplay;
+        public string VbsStatusDisplay => "VBS Status: " + DeviceGuardStatus.VbsStatusDisplay;
+        public string SecurityServicesConfiguredDisplay => "Configured Services: " + DeviceGuardStatus.SecurityServicesConfiguredDisplay;
+        public string SecurityServicesRunningDisplay => "Running Services: " + DeviceGuardStatus.SecurityServicesRunningDisplay;
+
+        private async Task<DeviceGuardStatus> LoadDeviceGuardStatusAsync()
+        {
+            // Slightly artificial delay to simulate real-world async data loading
+            await Task.Delay(500).ConfigureAwait(false);
+            return new DeviceGuardStatus
+            {
+                // Only set writable properties, not read-only display properties
+                CodeIntegrityPolicyEnforcementStatus = 1,
+                VirtualizationBasedSecurityStatus = 1,
+                SecurityServicesConfigured = new uint[] { 1 },
+                SecurityServicesRunning = new uint[] { 1 },
+            };
+        }
+
         public async Task RefreshDataAsync()
         {
             try
@@ -293,6 +333,10 @@ namespace MDE_Monitoring_App
                 var policyTask = Task.Run(_policyService.LoadPolicies);
                 var latestTask = _latestVersionService.GetLatestAsync();
                 var intuneSyncTask = Task.Run(_intuneSyncService.GetLastSync);
+                var appControlStatusTask = Task.Run(_appControlStatusService.GetStatus);
+                var appControlLogsTask = Task.Run(() => _appControlLogService.GetRecent(150));
+                //var deviceGuardStatusTask = Task.Run(LoadDeviceGuardStatusAsync);
+                var deviceGuardTask = Task.Run(_deviceGuardStatusService.GetStatus);
 
                 var dcEvents = await dcTask.ConfigureAwait(false);
                 var newLogs = await logsTask.ConfigureAwait(false);
@@ -301,6 +345,10 @@ namespace MDE_Monitoring_App
                 var policies = await policyTask.ConfigureAwait(false);
                 var latest = await latestTask.ConfigureAwait(false);
                 var intuneLastSync = await intuneSyncTask.ConfigureAwait(false);
+                var appControlStatus = await appControlStatusTask.ConfigureAwait(false);
+                var appControlLogs = await appControlLogsTask.ConfigureAwait(false);
+                //var deviceGuardStatus = await deviceGuardStatusTask.ConfigureAwait(false);
+                var deviceGuardStatus = await deviceGuardTask.ConfigureAwait(false);
 
                 App.Current.Dispatcher.Invoke(() =>
                 {
@@ -336,6 +384,14 @@ namespace MDE_Monitoring_App
                     LatestFetchState = latest.state;
                     LatestFetchError = latest.error;
                     IntuneLastSyncUtc = intuneLastSync;
+
+                    // In your RefreshDataAsync method, replace this line:
+                    AppControlStatus = appControlStatus;
+
+                    AppControlEvents.Clear();
+                    foreach (var ev in appControlLogs) AppControlEvents.Add(ev);
+
+                    DeviceGuardStatus = deviceGuardStatus;
 
                     LastRefreshed = DateTime.Now;
                     LogsView.Refresh();
@@ -397,8 +453,97 @@ namespace MDE_Monitoring_App
             catch { return "Unknown"; }
         }
 
+        public IReadOnlyList<FirewallLogService.FirewallProfileLogStatus> FirewallProfileStatuses
+        {
+            get => _firewallProfileStatuses;
+            private set
+            {
+                _firewallProfileStatuses = value;
+                OnPropertyChanged();
+                UpdateFirewallLoggingStatusMessage();
+            }
+        }
+        private IReadOnlyList<FirewallLogService.FirewallProfileLogStatus> _firewallProfileStatuses =
+            Array.Empty<FirewallLogService.FirewallProfileLogStatus>();
+
+        public string FirewallLoggingStatusMessage
+        {
+            get => _firewallLoggingStatusMessage;
+            private set
+            {
+                if (_firewallLoggingStatusMessage != value)
+                {
+                    _firewallLoggingStatusMessage = value;
+                    OnPropertyChanged();
+                    OnPropertyChanged(nameof(ShowFirewallLoggingStatusMessage));
+                }
+            }
+        }
+        private string _firewallLoggingStatusMessage = string.Empty;
+        // Add this property to your MainViewModel class
+        private AppControlStatus _appControlStatus = new();
+
+        public bool ShowFirewallLoggingStatusMessage => !string.IsNullOrEmpty(FirewallLoggingStatusMessage);
+        public AppControlStatus AppControlStatus
+        {
+            get => _appControlStatus;
+            private set
+            {
+                if (_appControlStatus != value)
+                {
+                    _appControlStatus = value;
+                    OnPropertyChanged();
+                }
+            }
+        }
+        private void UpdateFirewallLoggingStatusMessage()
+        {
+            if (FirewallProfileStatuses.Count == 0)
+            {
+                FirewallLoggingStatusMessage = "No firewall profiles detected.";
+                return;
+            }
+
+            var noDropped = FirewallProfileStatuses.Where(p => !p.LogDropped).Select(p => p.Profile).ToList();
+            var noAllowed = FirewallProfileStatuses.Where(p => !p.LogAllowed).Select(p => p.Profile).ToList();
+
+            if (!noDropped.Any() && !noAllowed.Any())
+            {
+                FirewallLoggingStatusMessage = string.Empty; // All good, hide message
+                return;
+            }
+
+            var parts = new List<string>();
+            if (noDropped.Any())
+                parts.Add("Dropped packet logging disabled for: " + string.Join(", ", noDropped));
+            if (noAllowed.Any())
+                parts.Add("Allowed connection logging disabled for: " + string.Join(", ", noAllowed));
+
+            parts.Add("Enable with (example):");
+            parts.Add("  netsh advfirewall set allprofiles logging droppedconnections enable");
+            parts.Add("  netsh advfirewall set allprofiles logging allowedconnections enable");
+
+            FirewallLoggingStatusMessage = string.Join(Environment.NewLine, parts);
+        }
+
         public event PropertyChangedEventHandler? PropertyChanged;
         private void OnPropertyChanged([CallerMemberName] string? prop = null) =>
             PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(prop));
+
+public async Task<bool> ExportPdfAsync(string filePath, CancellationToken ct = default)
+{
+    try
+    {
+        var exporter = new PdfExportService();
+        // Heavy work off UI thread
+        var bytes = await Task.Run(() => exporter.BuildReport(this), ct).ConfigureAwait(false);
+        await File.WriteAllBytesAsync(filePath, bytes, ct).ConfigureAwait(false);
+        return true;
+    }
+    catch
+    {
+        return false;
+    }
+}
     }
 }

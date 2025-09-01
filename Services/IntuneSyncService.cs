@@ -1,46 +1,63 @@
 using System;
-using System.Diagnostics;
-using System.Globalization;
+using System.Diagnostics.Eventing.Reader;
 
 namespace MDE_Monitoring_App.Services
 {
     public class IntuneSyncService
     {
-        // Parses "dsregcmd /status" output for "Last Device Sync Time"
+        // Event ID used to indicate end of an MDM (Intune) sync session
+        private const int SyncCompletedEventId = 209;
+
+        // Channels to probe (some systems may not have the Sync channel)
+        private static readonly string[] Channels =
+        {
+            "Microsoft-Windows-DeviceManagement-Enterprise-Diagnostics-Provider/Admin",
+            "Microsoft-Windows-DeviceManagement-Enterprise-Diagnostics-Provider/Sync"
+        };
+
+        /// <summary>
+        /// Returns the TimeCreated (UTC) of the most recent Intune MDM sync completion event (ID 209),
+        /// or null if none found or logs unavailable.
+        /// </summary>
         public DateTime? GetLastSync()
         {
-            try
-            {
-                var psi = new ProcessStartInfo("dsregcmd.exe", "/status")
-                {
-                    RedirectStandardOutput = true,
-                    UseShellExecute = false,
-                    CreateNoWindow = true
-                };
-                using var proc = Process.Start(psi);
-                if (proc == null) return null;
-                string output = proc.StandardOutput.ReadToEnd();
-                proc.WaitForExit();
+            DateTime? latest = null;
 
-                // Look for a line like: "Last Device Sync Time : 2024-08-31 15:22:10.000 UTC"
-                foreach (var line in output.Split(new[] { '\r', '\n' }, StringSplitOptions.RemoveEmptyEntries))
+            foreach (var channel in Channels)
+            {
+                try
                 {
-                    if (line.Contains("Last Device Sync Time", StringComparison.OrdinalIgnoreCase))
+                    // XPath: any event with EventID=209. ReverseDirection gives newest first.
+                    var query = new EventLogQuery(channel, PathType.LogName, "*[System[(EventID=" + SyncCompletedEventId + ")]]")
                     {
-                        var parts = line.Split(':', 2);
-                        if (parts.Length == 2)
-                        {
-                            var raw = parts[1].Trim();
-                            // Remove trailing timezone text if present
-                            raw = raw.Replace("UTC", "", StringComparison.OrdinalIgnoreCase).Trim();
-                            if (DateTime.TryParse(raw, CultureInfo.InvariantCulture, DateTimeStyles.AssumeUniversal | DateTimeStyles.AdjustToUniversal, out var dt))
-                                return dt.ToUniversalTime();
-                        }
+                        ReverseDirection = true
+                    };
+
+                    using var reader = new EventLogReader(query);
+                    using EventRecord? record = reader.ReadEvent(); // first (newest) match
+                    if (record?.TimeCreated != null)
+                    {
+                        var utc = record.TimeCreated.Value.ToUniversalTime();
+                        if (latest == null || utc > latest)
+                            latest = utc;
                     }
                 }
+                catch (EventLogNotFoundException)
+                {
+                    // Channel might not exist on this system – ignore
+                }
+                catch
+                {
+                    // Swallow other access issues; keep trying remaining channels
+                }
             }
-            catch { }
-            return null;
+
+            return latest;
         }
+
+        /// <summary>
+        /// Async wrapper for UI callers.
+        /// </summary>
+        public Task<DateTime?> GetLastSyncAsync() => Task.Run(GetLastSync);
     }
 }

@@ -32,6 +32,8 @@
                             <Run Text="Last Refreshed: "/>
                             <Run Text="{Binding LastRefreshed, Mode=OneWay, StringFormat='Last refreshed: {0:G}'}"/>
                         </TextBlock>
+                        <Button Content="Export PDF" Click="ExportPdf_Click" Margin="10,0,0,0"
+                                Background="#004578" Foreground="White" Padding="6,2"/>
                     </StackPanel>
 
                     <!-- Info and Status Grid -->
@@ -89,8 +91,8 @@
                                         </Run.Style>
                                     </Run>
                                 </TextBlock>
-
-                                <TextBlock Text="{Binding DefenderStatus.AMRunningMode, StringFormat=Running Mode: {0}}" Margin="0,6,0,0"/>
+                                <TextBlock Text="{Binding DefenderStatus.AntivirusSignatureAge, StringFormat=Antivirus Signature Age: {0}}" Margin="0,2,0,0"/>
+                                <TextBlock Text="{Binding DefenderStatus.AntispywareSignatureAge, StringFormat=Antispyware Signature Age: {0}}" Margin="0,2,0,0"/>
                             </StackPanel>
                         </Border>
 
@@ -101,10 +103,13 @@
                             <StackPanel>
                                 <TextBlock Text="Protection Status" FontWeight="Bold" FontSize="16" Foreground="#0078D4" Margin="0,0,0,10"/>
                                 <TextBlock Text="{Binding DefenderStatus.RealTimeProtection, StringFormat=Real-Time Protection: {0}}" Margin="0,2,0,0"/>
-                                <TextBlock Text="{Binding DefenderStatus.AntivirusSignatureAge, StringFormat=Antivirus Signature Age: {0}}" Margin="0,2,0,0"/>
-                                <TextBlock Text="{Binding DefenderStatus.AntispywareSignatureAge, StringFormat=Antispyware Signature Age: {0}}" Margin="0,2,0,0"/>
+                                <TextBlock Text="{Binding DefenderStatus.AMRunningMode, StringFormat=Running Mode: {0}}" Margin="0,2,0,0"/>
                                 <TextBlock Text="{Binding DefenderStatus.DeviceControlDefaultEnforcement, StringFormat=Device Control Enforcement: {0}}" Margin="0,2,0,0"/>
                                 <TextBlock Text="{Binding DefenderStatus.DeviceControlState, StringFormat=Device Control State: {0}}" Margin="0,2,0,0"/>
+                                <TextBlock Text="{Binding CodeIntegrityPolicyDisplay}" Margin="0,4,0,0"/>
+                                <TextBlock Text="{Binding VbsStatusDisplay}" Margin="0,2,0,0"/>
+                                <TextBlock Text="{Binding SecurityServicesConfiguredDisplay}" Margin="0,2,0,0"/>
+                                <TextBlock Text="{Binding SecurityServicesRunningDisplay}" Margin="0,2,0,0"/>
                             </StackPanel>
                         </Border>
 
@@ -204,6 +209,24 @@
                             <Run Text="Last Refreshed: "/>
                             <Run Text="{Binding LastRefreshed, Mode=OneWay, StringFormat='Last refreshed: {0:G}'}"/>
                         </TextBlock>
+
+                        <!-- Status message for firewall logging -->
+                        <TextBlock Margin="10,0,0,0"
+                                   Text="{Binding FirewallLoggingStatusMessage}"
+                                   Foreground="OrangeRed"
+                                   TextWrapping="Wrap">
+                            <TextBlock.Style>
+                                <Style TargetType="TextBlock">
+                                    <Setter Property="Visibility" Value="Collapsed"/>
+                                    <Style.Triggers>
+                                        <DataTrigger Binding="{Binding ShowFirewallLoggingStatusMessage}" Value="True">
+                                            <Setter Property="Visibility" Value="Visible"/>
+                                        </DataTrigger>
+                                    </Style.Triggers>
+                                </Style>
+                            </TextBlock.Style>
+                        </TextBlock>
+
                         <DockPanel Margin="30,0,0,0" VerticalAlignment="Center">
                             <TextBox x:Name="FirewallFilterBox"
                                      Width="220"
@@ -260,6 +283,52 @@
                                     <Style TargetType="TextBlock">
                                         <Setter Property="TextTrimming" Value="CharacterEllipsis"/>
                                         <Setter Property="ToolTip" Value="{Binding Path}"/>
+                                    </Style>
+                                </DataGridTextColumn.ElementStyle>
+                            </DataGridTextColumn>
+                        </DataGrid.Columns>
+                    </DataGrid>
+                </Grid>
+            </TabItem>
+
+            <!-- App Control Tab -->
+            <TabItem Header="App Control">
+                <Grid Margin="10">
+                    <Grid.RowDefinitions>
+                        <RowDefinition Height="Auto"/>
+                        <RowDefinition Height="*"/>
+                    </Grid.RowDefinitions>
+
+                    <StackPanel Orientation="Horizontal" Margin="0,0,0,10">
+                        <TextBlock Text="App Control (Code Integrity / AppLocker)" FontSize="18" FontWeight="Bold" Foreground="#0078D4" VerticalAlignment="Center"/>
+                        <Button Content="Refresh" Click="RefreshButton_Click" Margin="20,0,0,0"
+                    Background="#0078D4" Foreground="White" Padding="6,2"/>
+                        <TextBlock Margin="20,0,0,0" VerticalAlignment="Center">
+                <Run Text="Last Refreshed: "/>
+                <Run Text="{Binding LastRefreshed, Mode=OneWay, StringFormat='Last refreshed: {0:G}'}"/>
+                        </TextBlock>
+                    </StackPanel>
+
+                    <DataGrid Grid.Row="1"
+                  ItemsSource="{Binding AppControlEvents}"
+                  AutoGenerateColumns="False"
+                  IsReadOnly="True"
+                  AlternatingRowBackground="#E6F0FA"
+                  RowBackground="White"
+                  FontSize="13"
+                  RowHeight="26"
+                  ScrollViewer.VerticalScrollBarVisibility="Auto"
+                  ScrollViewer.HorizontalScrollBarVisibility="Auto">
+                        <DataGrid.Columns>
+                            <DataGridTextColumn Header="Time" Binding="{Binding Time, StringFormat={}{0:yyyy-MM-dd HH:mm:ss}}" Width="170"/>
+                            <DataGridTextColumn Header="ID" Binding="{Binding Id}" Width="70"/>
+                            <DataGridTextColumn Header="Level" Binding="{Binding Level}" Width="80"/>
+                            <DataGridTextColumn Header="Channel" Binding="{Binding Channel}" Width="220"/>
+                            <DataGridTextColumn Header="Message" Binding="{Binding Message}" Width="*">
+                                <DataGridTextColumn.ElementStyle>
+                                    <Style TargetType="TextBlock">
+                                        <Setter Property="TextWrapping" Value="Wrap"/>
+                                        <Setter Property="ToolTip" Value="{Binding Message}"/>
                                     </Style>
                                 </DataGridTextColumn.ElementStyle>
                             </DataGridTextColumn>
