@@ -7,7 +7,7 @@ namespace MDE_Monitoring_App.Services
 {
     public class LogCollector
     {
-        public ObservableCollection<LogEntry> GetDefenderLogs(int max = 400)
+        public ObservableCollection<LogEntry> GetDefenderLogs()
         {
             var output = new ObservableCollection<LogEntry>();
 
@@ -24,7 +24,7 @@ namespace MDE_Monitoring_App.Services
             {
                 using var reader = new EventLogReader(query);
                 EventRecord? rec;
-                while ((rec = reader.ReadEvent()) != null && output.Count < max)
+                while ((rec = reader.ReadEvent()) != null)
                 {
                     var level = rec.Level switch
                     {

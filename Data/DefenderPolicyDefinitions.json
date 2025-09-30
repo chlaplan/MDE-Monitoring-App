@@ -1,96 +1,87 @@
 [
-  /* --- Core Real-time & Behavioral Protection (legacy disable + modern allow) --- */
-  { "Name": "DisableRealTimeMonitoring", "DisplayName": "Real-Time Protection (Legacy Disable)", "Description": "Legacy flag disabling real-time scanning.", "Kind": "disableFlag", "EnabledMeaning": "Enabled", "DisabledMeaning": "Disabled", "RiskWhenDisabled": "Risk" },
-  { "Name": "AllowRealtimeMonitoring", "DisplayName": "Real-Time Protection", "Description": "Core on-access protection engine.", "Kind": "allowFlag", "EnabledMeaning": "Enabled", "DisabledMeaning": "Disabled", "RiskWhenDisabled": "Risk" },
+  /* ================= CORE REAL-TIME & BEHAVIORAL PROTECTION ================= */
+  { "Name": "AllowRealtimeMonitoring", "DisplayName": "Real-Time Protection", "Description": "Core on-access scanning engine.", "Kind": "allowFlag", "EnabledMeaning": "Enabled", "DisabledMeaning": "Disabled", "RiskWhenDisabled": "Risk" },
+  { "Name": "DisableRealTimeMonitoring", "DisplayName": "Real-Time Protection (Legacy Disable)", "Description": "Legacy flag disabling on-access scanning.", "Kind": "disableFlag", "EnabledMeaning": "Enabled", "DisabledMeaning": "Disabled", "RiskWhenDisabled": "Risk" },
+  { "Name": "AllowBehaviorMonitoring", "DisplayName": "Behavior Monitoring", "Description": "Suspicious behavior detection heuristics.", "Kind": "allowFlag", "EnabledMeaning": "Enabled", "DisabledMeaning": "Disabled", "RiskWhenDisabled": "Risk" },
+  { "Name": "DisableBehaviorMonitoring", "DisplayName": "Behavior Monitoring (Legacy Disable)", "Description": "Legacy disable flag.", "Kind": "disableFlag", "EnabledMeaning": "Enabled", "DisabledMeaning": "Disabled", "RiskWhenDisabled": "Risk" },
+  { "Name": "AllowIOAVProtection", "DisplayName": "Downloaded File Scanning (IOAV)", "Description": "Scans incoming downloads & attachments.", "Kind": "allowFlag", "EnabledMeaning": "Enabled", "DisabledMeaning": "Disabled", "RiskWhenDisabled": "Risk" },
+  { "Name": "DisableIOAVProtection", "DisplayName": "Downloaded File Scanning (Legacy Disable)", "Description": "Legacy disable flag.", "Kind": "disableFlag", "EnabledMeaning": "Enabled", "DisabledMeaning": "Disabled", "RiskWhenDisabled": "Risk" },
+  { "Name": "AllowScriptScanning", "DisplayName": "Script Scanning", "Description": "Scans scripts via registered engines.", "Kind": "allowFlag", "EnabledMeaning": "Enabled", "DisabledMeaning": "Disabled", "RiskWhenDisabled": "Risk" },
+  { "Name": "DisableScriptScanning", "DisplayName": "Script Scanning (Legacy Disable)", "Description": "Legacy disable flag.", "Kind": "disableFlag", "EnabledMeaning": "Enabled", "DisabledMeaning": "Disabled", "RiskWhenDisabled": "Risk" },
+  { "Name": "AllowArchiveScanning", "DisplayName": "Archive Scanning", "Description": "Scans inside compressed files.", "Kind": "allowFlag", "EnabledMeaning": "Enabled", "DisabledMeaning": "Disabled", "RiskWhenDisabled": "Info" },
+  { "Name": "DisableArchiveScanning", "DisplayName": "Archive Scanning (Legacy Disable)", "Description": "Legacy disable flag.", "Kind": "disableFlag", "EnabledMeaning": "Enabled", "DisabledMeaning": "Disabled", "RiskWhenDisabled": "Info" },
+  { "Name": "AllowEmailScanning", "DisplayName": "Email Scanning", "Description": "Scans email payloads.", "Kind": "allowFlag", "EnabledMeaning": "Enabled", "DisabledMeaning": "Disabled", "RiskWhenDisabled": "Info" },
+  { "Name": "DisableEmailScanning", "DisplayName": "Email Scanning (Legacy Disable)", "Description": "Legacy disable flag.", "Kind": "disableFlag", "EnabledMeaning": "Enabled", "DisabledMeaning": "Disabled", "RiskWhenDisabled": "Info" },
 
-  { "Name": "DisableBehaviorMonitoring", "DisplayName": "Behavior Monitoring (Legacy Disable)", "Description": "Legacy behavior monitoring disable flag.", "Kind": "disableFlag", "EnabledMeaning": "Enabled", "DisabledMeaning": "Disabled", "RiskWhenDisabled": "Risk" },
-  { "Name": "AllowBehaviorMonitoring", "DisplayName": "Behavior Monitoring", "Description": "Heuristic & behavioral detection.", "Kind": "allowFlag", "EnabledMeaning": "Enabled", "DisabledMeaning": "Disabled", "RiskWhenDisabled": "Risk" },
+  /* ================= CLOUD / MAPS / PUA / NETWORK ================= */
+  { "Name": "AllowCloudProtection", "DisplayName": "Cloud Protection", "Description": "Cloud-delivered protection & heuristics.", "Kind": "allowFlag", "EnabledMeaning": "Enabled", "DisabledMeaning": "Disabled", "RiskWhenDisabled": "Risk" },
+  { "Name": "DisableBlockAtFirstSeen", "DisplayName": "Block At First Seen (Legacy Disable)", "Description": "Early cloud block of suspicious files.", "Kind": "disableFlag", "EnabledMeaning": "Active", "DisabledMeaning": "Inactive", "RiskWhenDisabled": "Risk" },
+  { "Name": "CloudBlockLevel", "DisplayName": "Cloud Block Level", "Description": "Aggressiveness of cloud blocking.", "Kind": "enum", "EnumMap": { "0": "Default", "1": "High", "2": "High+", "4": "Zero Tolerance" } },
+  { "Name": "MAPSReporting", "DisplayName": "Cloud Reporting (MAPS)", "Description": "Telemetry upload level.", "Kind": "enum", "EnumMap": { "0": "Disabled", "1": "Basic", "2": "Advanced" } },
+  { "Name": "PUAProtection", "DisplayName": "PUA Protection", "Description": "Potentially unwanted apps mode.", "Kind": "enum", "EnumMap": { "0": "Off", "1": "On", "2": "Audit" } },
+  { "Name": "SubmitSamplesConsent", "DisplayName": "Sample Submission", "Description": "Automatic sample submission behavior.", "Kind": "enum", "EnumMap": { "0": "Prompt", "1": "Send Safe", "2": "Never", "3": "Send All" } },
+  { "Name": "EnableNetworkProtection", "DisplayName": "Network Protection", "Description": "Block malicious domains & URLs (0=Off,1=Block,2=Audit).", "Kind": "enum", "EnumMap": { "0": "Off", "1": "Block", "2": "Audit" } },
 
-  { "Name": "DisableIOAVProtection", "DisplayName": "Downloaded File Scanning (Legacy Disable)", "Description": "Legacy IOAV flag.", "Kind": "disableFlag", "EnabledMeaning": "Enabled", "DisabledMeaning": "Disabled", "RiskWhenDisabled": "Risk" },
-  { "Name": "AllowIOAVProtection", "DisplayName": "Downloaded File Scanning (IOAV)", "Description": "Scans downloads & attachments.", "Kind": "allowFlag", "EnabledMeaning": "Enabled", "DisabledMeaning": "Disabled", "RiskWhenDisabled": "Risk" },
+  /* ================= ATTACK SURFACE REDUCTION ================= */
+  { "Name": "ASRRules", "DisplayName": "Attack Surface Reduction Rules", "Description": "GUID=State list (0=Disabled,1=Enabled,2=Audit).", "Kind": "raw" },
+  { "Name": "ASROnlyExclusions", "DisplayName": "ASR Global Exclusions", "Description": "Global exclusions list.", "Kind": "raw" },
+  { "Name": "ASROnlyPerRuleExclusions", "DisplayName": "ASR Per-Rule Exclusions", "Description": "Per rule exclusion mapping.", "Kind": "raw" },
 
-  { "Name": "DisableScriptScanning", "DisplayName": "Script Scanning (Legacy Disable)", "Description": "Legacy script scan flag.", "Kind": "disableFlag", "EnabledMeaning": "Enabled", "DisabledMeaning": "Disabled", "RiskWhenDisabled": "Risk" },
-  { "Name": "AllowScriptScanning", "DisplayName": "Script Scanning", "Description": "Scans script engines.", "Kind": "allowFlag", "EnabledMeaning": "Enabled", "DisabledMeaning": "Disabled", "RiskWhenDisabled": "Risk" },
+  /* ================= CONTROLLED FOLDER ACCESS / RANSOMWARE ================= */
+  { "Name": "EnableControlledFolderAccess", "DisplayName": "Controlled Folder Access", "Description": "0=Off,1=Block,2=Audit,3=Unknown.", "Kind": "enum", "EnumMap": { "0": "Off", "1": "Block", "2": "Audit", "3": "Unknown" } },
 
-  { "Name": "DisableArchiveScanning", "DisplayName": "Archive Scanning (Legacy Disable)", "Description": "Legacy archive scan flag.", "Kind": "disableFlag", "EnabledMeaning": "Enabled", "DisabledMeaning": "Disabled", "RiskWhenDisabled": "Risk" },
-  { "Name": "AllowArchiveScanning", "DisplayName": "Archive Scanning", "Description": "Scans inside compressed files.", "Kind": "allowFlag", "EnabledMeaning": "Enabled", "DisabledMeaning": "Disabled", "RiskWhenDisabled": "Risk" },
+  /* ================= DEVICE CONTROL ================= */
+  { "Name": "DefaultEnforcement", "DisplayName": "Device Control Default Enforcement", "Description": "Baseline mode: 0=Unspecified,1=Enabled,2=Audit,3=Warn.", "Kind": "enum", "EnumMap": { "0": "Unspecified", "1": "Enabled", "2": "Audit", "3": "Warn" } },
 
-  { "Name": "DisableEmailScanning", "DisplayName": "Email Scanning (Legacy Disable)", "Description": "Legacy email scan flag.", "Kind": "disableFlag", "EnabledMeaning": "Enabled", "DisabledMeaning": "Disabled", "RiskWhenDisabled": "Risk" },
-  { "Name": "AllowEmailScanning", "DisplayName": "Email Scanning", "Description": "Scans email payloads.", "Kind": "allowFlag", "EnabledMeaning": "Enabled", "DisabledMeaning": "Disabled", "RiskWhenDisabled": "Risk" },
-
-  /* --- Removable / network / mapped drives --- */
-  { "Name": "DisableRemovableDriveScanning", "DisplayName": "Removable Drive Scanning (Legacy Disable)", "Description": "Legacy removable media scan flag.", "Kind": "disableFlag", "EnabledMeaning": "Enabled", "DisabledMeaning": "Disabled", "RiskWhenDisabled": "Info" },
+  /* ================= REMOVABLE / NETWORK / MAPPED DRIVES ================= */
+  { "Name": "DisableRemovableDriveScanning", "DisplayName": "Removable Drive Scanning (Legacy Disable)", "Description": "Legacy disable flag for removable media scanning.", "Kind": "disableFlag", "EnabledMeaning": "Enabled", "DisabledMeaning": "Disabled", "RiskWhenDisabled": "Info" },
   { "Name": "AllowFullScanRemovableDriveScanning", "DisplayName": "Full Scan Removable Drives", "Description": "Include removable drives in full scans.", "Kind": "allowFlag", "EnabledMeaning": "Included", "DisabledMeaning": "Excluded", "RiskWhenDisabled": "Info" },
-
-  { "Name": "DisableScanningNetworkFiles", "DisplayName": "Network File Scanning (Legacy Disable)", "Description": "Legacy network file scan flag.", "Kind": "disableFlag", "EnabledMeaning": "Enabled", "DisabledMeaning": "Disabled", "RiskWhenDisabled": "Info" },
-  { "Name": "AllowScanningNetworkFiles", "DisplayName": "Network File Scanning", "Description": "Scan files over network.", "Kind": "allowFlag", "EnabledMeaning": "Enabled", "DisabledMeaning": "Disabled", "RiskWhenDisabled": "Info" },
-
-  { "Name": "DisableScanningMappedNetworkDrivesForFullScan", "DisplayName": "Mapped Drive Full Scan (Legacy Disable)", "Description": "Legacy mapped drive flag.", "Kind": "disableFlag", "EnabledMeaning": "Included", "DisabledMeaning": "Excluded", "RiskWhenDisabled": "Info" },
+  { "Name": "DisableScanningNetworkFiles", "DisplayName": "Network File Scanning (Legacy Disable)", "Description": "Legacy flag controlling scan of network files.", "Kind": "disableFlag", "EnabledMeaning": "Enabled", "DisabledMeaning": "Disabled", "RiskWhenDisabled": "Info" },
+  { "Name": "AllowScanningNetworkFiles", "DisplayName": "Network File Scanning", "Description": "Scan files accessed over network shares.", "Kind": "allowFlag", "EnabledMeaning": "Enabled", "DisabledMeaning": "Disabled", "RiskWhenDisabled": "Info" },
+  { "Name": "DisableScanningMappedNetworkDrivesForFullScan", "DisplayName": "Mapped Drive Full Scan (Legacy Disable)", "Description": "Legacy disable flag.", "Kind": "disableFlag", "EnabledMeaning": "Included", "DisabledMeaning": "Excluded", "RiskWhenDisabled": "Info" },
   { "Name": "AllowFullScanOnMappedNetworkDrives", "DisplayName": "Full Scan Mapped Drives", "Description": "Include mapped drives in full scans.", "Kind": "allowFlag", "EnabledMeaning": "Included", "DisabledMeaning": "Excluded", "RiskWhenDisabled": "Info" },
 
-  /* --- Catch-up & performance --- */
-  { "Name": "DisableCatchupQuickScan", "DisplayName": "Catch-Up Quick Scan (Legacy Disable)", "Description": "Run missed quick scans.", "Kind": "disableFlag", "EnabledMeaning": "Enabled", "DisabledMeaning": "Disabled", "RiskWhenDisabled": "Info" },
-  { "Name": "DisableCatchupFullScan", "DisplayName": "Catch-Up Full Scan (Legacy Disable)", "Description": "Run missed full scans.", "Kind": "disableFlag", "EnabledMeaning": "Enabled", "DisabledMeaning": "Disabled", "RiskWhenDisabled": "Info" },
-
-  { "Name": "DisableCpuThrottleOnIdleScans", "DisplayName": "CPU Throttle On Idle Scans (Legacy Disable)", "Description": "Performance throttling for idle scans.", "Kind": "disableFlag", "EnabledMeaning": "Throttling Enabled", "DisabledMeaning": "No Throttle", "RiskWhenDisabled": "Info" },
-  { "Name": "AvgCPULoadFactor", "DisplayName": "Average CPU Load Target", "Description": "Percent CPU load target.", "Kind": "percent" },
-  { "Name": "ScanAvgCPULoadFactor", "DisplayName": "Scan CPU Load Target", "Description": "Percent CPU load target.", "Kind": "percent" },
+  /* ================= PERFORMANCE / CPU / THROTTLING ================= */
+  { "Name": "DisableCpuThrottleOnIdleScans", "DisplayName": "CPU Throttle On Idle Scans (Legacy Disable)", "Description": "Disable to remove throttling.", "Kind": "disableFlag", "EnabledMeaning": "Throttling Enabled", "DisabledMeaning": "No Throttle", "RiskWhenDisabled": "Info" },
+  { "Name": "AvgCPULoadFactor", "DisplayName": "Average CPU Load Target", "Description": "Percent CPU load target for background tasks.", "Kind": "percent" },
+  { "Name": "ScanAvgCPULoadFactor", "DisplayName": "Scan CPU Load Target", "Description": "Percent CPU load target during scans.", "Kind": "percent" },
   { "Name": "EnableLowCPUPriority", "DisplayName": "Low CPU Priority", "Description": "Lower process priority for scans.", "Kind": "allowFlag", "EnabledMeaning": "Enabled", "DisabledMeaning": "Disabled", "RiskWhenDisabled": "Info" },
 
-  /* --- Cloud / MAPS / PUA / network protection --- */
-  { "Name": "DisableBlockAtFirstSeen", "DisplayName": "Block At First Seen (Legacy Disable)", "Description": "Legacy early cloud block flag.", "Kind": "disableFlag", "EnabledMeaning": "Active", "DisabledMeaning": "Inactive", "RiskWhenDisabled": "Risk" },
-  { "Name": "AllowCloudProtection", "DisplayName": "Cloud Protection", "Description": "Cloud-based blocking & heuristics.", "Kind": "allowFlag", "EnabledMeaning": "Enabled", "DisabledMeaning": "Disabled", "RiskWhenDisabled": "Risk" },
-  { "Name": "EnableNetworkProtection", "DisplayName": "Network Protection", "Description": "0=Off,1=Block,2=Audit.", "Kind": "enum", "EnumMap": { "0": "Off", "1": "Block", "2": "Audit" } },
-  { "Name": "CloudBlockLevel", "DisplayName": "Cloud Block Level", "Description": "Cloud aggressiveness.", "Kind": "enum", "EnumMap": { "0": "Default", "1": "High", "2": "High+", "4": "Zero Tolerance" } },
-  { "Name": "MAPSReporting", "DisplayName": "Cloud Reporting Level (MAPS)", "Description": "Telemetry level.", "Kind": "enum", "EnumMap": { "0": "Disabled", "1": "Basic", "2": "Advanced" } },
-  { "Name": "PUAProtection", "DisplayName": "PUA Protection", "Description": "Potentially unwanted apps.", "Kind": "enum", "EnumMap": { "0": "Off", "1": "On", "2": "Audit" } },
-  { "Name": "SubmitSamplesConsent", "DisplayName": "Sample Submission", "Description": "Sample submission behavior.", "Kind": "enum", "EnumMap": { "0": "Prompt", "1": "Send Safe", "2": "Never", "3": "Send All" } },
+  /* ================= AUTOMATIC REMEDIATION & EXCLUSIONS MERGE ================= */
+  { "Name": "DisableRoutinelyTakingAction", "DisplayName": "Automatic Remediation (Legacy Disable)", "Description": "Disables automatic actions if set.", "Kind": "disableFlag", "EnabledMeaning": "Active", "DisabledMeaning": "Suspended", "RiskWhenDisabled": "Risk" },
+  { "Name": "DisableExclusions", "DisplayName": "Local Exclusions Merge (Legacy Disable)", "Description": "When disabled, local exclusions ignored.", "Kind": "disableFlag", "EnabledMeaning": "Merge Allowed", "DisabledMeaning": "Local Ignored", "RiskWhenDisabled": "Info" },
+  { "Name": "DisableLocalAdminMerge", "DisplayName": "Local Admin Exclusion Merge (Legacy Disable)", "Description": "Blocks merging admin-provided exclusions.", "Kind": "disableFlag", "EnabledMeaning": "Merge Allowed", "DisabledMeaning": "Merge Blocked", "RiskWhenDisabled": "Info" },
 
-  /* --- Automatic remediation & exclusions merging --- */
-  { "Name": "DisableRoutinelyTakingAction", "DisplayName": "Automatic Remediation (Legacy Disable)", "Description": "Legacy remediation disable flag.", "Kind": "disableFlag", "EnabledMeaning": "Active", "DisabledMeaning": "Suspended", "RiskWhenDisabled": "Risk" },
-  { "Name": "DisableExclusions", "DisplayName": "Local Exclusions Merge (Legacy Disable)", "Description": "Block local exclusion merging.", "Kind": "disableFlag", "EnabledMeaning": "Merge Allowed", "DisabledMeaning": "Local Ignored", "RiskWhenDisabled": "Info" },
-  { "Name": "DisableLocalAdminMerge", "DisplayName": "Local Admin Exclusion Merge (Legacy Disable)", "Description": "Block admin exclusion merge.", "Kind": "disableFlag", "EnabledMeaning": "Merge Allowed", "DisabledMeaning": "Merge Blocked", "RiskWhenDisabled": "Info" },
-
-  /* --- Controlled Folder Access / Device Control & misc allow flags (some via other hive usually) --- */
-  { "Name": "EnableControlledFolderAccess", "DisplayName": "Controlled Folder Access", "Description": "0=Off,1=Block,2=Audit,3=Unknown.", "Kind": "enum", "EnumMap": { "0": "Off", "1": "Block", "2": "Audit", "3": "Unknown" } },
-  { "Name": "DefaultEnforcement", "DisplayName": "Device Control Default Enforcement", "Description": "Device Control baseline mode.", "Kind": "enum", "EnumMap": { "0": "Unspecified", "1": "Enabled", "2": "Audit", "3": "Warn" } },
-
-  /* --- Scheduling & timing --- */
+  /* ================= SCHEDULING ================= */
   { "Name": "ScanParameters", "DisplayName": "Scheduled Scan Type", "Description": "1=Quick,2=Full.", "Kind": "enum", "EnumMap": { "1": "Quick Scan", "2": "Full Scan" } },
   { "Name": "ScanParameter", "DisplayName": "Scheduled Scan Type (Alias)", "Description": "Alias 1=Quick,2=Full.", "Kind": "enum", "EnumMap": { "1": "Quick Scan", "2": "Full Scan" } },
-  { "Name": "ScheduleScanDay", "DisplayName": "Scheduled Scan Day", "Description": "0=Everyday,1-7=Mon-Sun.", "Kind": "enum", "EnumMap": { "0": "Every Day", "1": "Monday", "2": "Tuesday", "3": "Wednesday", "4": "Thursday", "5": "Friday", "6": "Saturday", "7": "Sunday" } },
-  { "Name": "ScheduleScanTime", "DisplayName": "Scheduled Full Scan Time", "Description": "Minutes after midnight.", "Kind": "integer" },
-  { "Name": "ScheduleQuickScanTime", "DisplayName": "Scheduled Quick Scan Time", "Description": "Minutes after midnight.", "Kind": "integer" },
+  { "Name": "ScheduleScanDay", "DisplayName": "Scheduled Scan Day", "Description": "0=Every Day,1-7=Mon-Sun.", "Kind": "enum", "EnumMap": { "0": "Every Day", "1": "Monday", "2": "Tuesday", "3": "Wednesday", "4": "Thursday", "5": "Friday", "6": "Saturday", "7": "Sunday" } },
+  { "Name": "ScheduleScanTime", "DisplayName": "Scheduled Full Scan Time", "Description": "Minutes after midnight (local).", "Kind": "integer" },
+  { "Name": "ScheduleQuickScanTime", "DisplayName": "Scheduled Quick Scan Time", "Description": "Minutes after midnight (local).", "Kind": "integer" },
 
-  /* --- Retention & passive / mode toggles --- */
-  { "Name": "DaysToRetainCleanedMalware", "DisplayName": "Quarantine Retention (Days)", "Description": "Retention for cleaned items.", "Kind": "integer" },
-  { "Name": "ForceDefenderPassiveMode", "DisplayName": "Passive Mode", "Description": "0 Active / 1 Passive.", "Kind": "enum", "EnumMap": { "0": "Active Mode", "1": "Passive Mode" } },
+  /* ================= SIGNATURE / UPDATE SETTINGS ================= */
+  { "Name": "SignatureDisableUpdateOnStartupWithoutEngine", "DisplayName": "Sig Update w/o Engine Match (Legacy Disable)", "Description": "Block updates if engine mismatch (when disabled).", "Kind": "disableFlag", "EnabledMeaning": "Allowed", "DisabledMeaning": "Blocked", "RiskWhenDisabled": "Info" },
+  { "Name": "SignatureUpdateCatchupInterval", "DisplayName": "Signature Catch-Up Interval (Hours)", "Description": "Catch-up update cadence.", "Kind": "integer" },
+  { "Name": "SignatureUpdateInterval", "DisplayName": "Signature Update Interval (Hours)", "Description": "Primary signature update frequency.", "Kind": "integer" },
 
-  /* --- Misc features --- */
-  { "Name": "DisablePrivacyMode", "DisplayName": "Privacy Mode (Legacy Disable)", "Description": "Mask sensitive info.", "Kind": "disableFlag", "EnabledMeaning": "Enabled", "DisabledMeaning": "Disabled", "RiskWhenDisabled": "Info" },
-  { "Name": "DisableSpecialRunningModes", "DisplayName": "Special Running Modes (Legacy Disable)", "Description": "Safe / recovery mode protection.", "Kind": "disableFlag", "EnabledMeaning": "Enabled", "DisabledMeaning": "Disabled", "RiskWhenDisabled": "Info" },
+  /* ================= REAL-TIME SCAN DIRECTION ================= */
+  { "Name": "RealTimeScanDirection", "DisplayName": "Real-Time Scan Direction", "Description": "0=Both,1=Incoming,2=Outgoing.", "Kind": "enum", "EnumMap": { "0": "Both Directions", "1": "Incoming Only", "2": "Outgoing Only" } },
+
+  /* ================= THREAT DEFAULT ACTION MAPPING ================= */
+  { "Name": "ThreatSeverityDefaultAction", "DisplayName": "Threat Severity Default Actions", "Description": "Severity=Action mapping string.", "Kind": "raw" },
+
+  /* ================= QUARANTINE / RETENTION ================= */
+  { "Name": "DaysToRetainCleanedMalware", "DisplayName": "Quarantine Retention (Days)", "Description": "How long cleaned malware is retained.", "Kind": "integer" },
+
+  /* ================= MODE / PASSIVE ================= */
+  { "Name": "ForceDefenderPassiveMode", "DisplayName": "Passive Mode", "Description": "0 Active / 1 Passive mode.", "Kind": "enum", "EnumMap": { "0": "Active Mode", "1": "Passive Mode" } },
+
+  /* ================= PRIVACY / SPECIAL MODES ================= */
+  { "Name": "DisablePrivacyMode", "DisplayName": "Privacy Mode (Legacy Disable)", "Description": "Mask sensitive UI info.", "Kind": "disableFlag", "EnabledMeaning": "Enabled", "DisabledMeaning": "Disabled", "RiskWhenDisabled": "Info" },
+  { "Name": "DisableSpecialRunningModes", "DisplayName": "Special Running Modes (Legacy Disable)", "Description": "Safe / recovery mode protections.", "Kind": "disableFlag", "EnabledMeaning": "Enabled", "DisabledMeaning": "Disabled", "RiskWhenDisabled": "Info" },
   { "Name": "ServiceKeepAlive", "DisplayName": "Service Keep Alive (Legacy Disable)", "Description": "Keep service responsive.", "Kind": "disableFlag", "EnabledMeaning": "Enabled", "DisabledMeaning": "Disabled", "RiskWhenDisabled": "Info" },
-  { "Name": "DisableRestorePoint", "DisplayName": "Restore Point Creation (Legacy Disable)", "Description": "Create restore point pre-remediation.", "Kind": "disableFlag", "EnabledMeaning": "Created", "DisabledMeaning": "Not Created", "RiskWhenDisabled": "Info" },
+  { "Name": "DisableRestorePoint", "DisplayName": "Restore Point Creation (Legacy Disable)", "Description": "Create restore point before remediation.", "Kind": "disableFlag", "EnabledMeaning": "Created", "DisabledMeaning": "Not Created", "RiskWhenDisabled": "Info" },
 
-  /* --- Signature / update settings --- */
-  { "Name": "SignatureDisableUpdateOnStartupWithoutEngine", "DisplayName": "Sig Update w/o Engine Match (Legacy Disable)", "Description": "Block update if engine mismatch (when disabled).", "Kind": "disableFlag", "EnabledMeaning": "Allowed", "DisabledMeaning": "Blocked", "RiskWhenDisabled": "Info" },
-  { "Name": "SignatureUpdateCatchupInterval", "DisplayName": "Signature Catch-Up Interval (Hours)", "Description": "Catch-up update interval.", "Kind": "integer" },
-  { "Name": "SignatureUpdateInterval", "DisplayName": "Signature Update Interval (Hours)", "Description": "Primary recurring update interval.", "Kind": "integer" },
-
-  /* --- Real-time scanning direction --- */
-  { "Name": "RealTimeScanDirection", "DisplayName": "RealTime Scan Direction", "Description": "0=Both,1=Incoming,2=Outgoing.", "Kind": "enum", "EnumMap": { "0": "Both Directions", "1": "Incoming Only", "2": "Outgoing Only" } },
-
-  /* --- ASR & advanced threat reduction (special parsing in service) --- */
-  { "Name": "ASRRules", "DisplayName": "Attack Surface Reduction Rules", "Description": "Multi rule string GUID=state list.", "Kind": "raw" },
-  { "Name": "ASROnlyExclusions", "DisplayName": "ASR Global Exclusions", "Description": "Global ASR exclusions list.", "Kind": "raw" },
-  { "Name": "ASROnlyPerRuleExclusions", "DisplayName": "ASR Per-Rule Exclusions", "Description": "Per ASR rule exclusions.", "Kind": "raw" },
-
-  /* --- Allowed / application control style lists --- */
-  { "Name": "AllowedApplications", "DisplayName": "Allowed Applications List", "Description": "Allowed executables / patterns.", "Kind": "raw" },
-
-  /* --- Threat severity default action mapping --- */
-  { "Name": "ThreatSeverityDefaultAction", "DisplayName": "Threat Severity Default Actions", "Description": "Severity=Action mappings.", "Kind": "raw" },
-
-  /* --- Device Control / enforcement (some values may live outside Policy Manager on some versions) --- */
-  { "Name": "DefaultEnforcement", "DisplayName": "Device Control Default Enforcement", "Description": "Device Control base mode.", "Kind": "enum", "EnumMap": { "0": "Unspecified", "1": "Enabled", "2": "Audit", "3": "Warn" } }
+  /* ================= ALLOWED / APPLICATION CONTROL STYLE LISTS ================= */
+  { "Name": "AllowedApplications", "DisplayName": "Allowed Applications List", "Description": "Allowed executables / patterns.", "Kind": "raw" }
 ]

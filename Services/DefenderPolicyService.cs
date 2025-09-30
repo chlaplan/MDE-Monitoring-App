@@ -22,7 +22,6 @@ namespace MDE_Monitoring_App.Services
             @"\b[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}\b",
             RegexOptions.IgnoreCase | RegexOptions.Compiled);
 
-        // Complete ASR GUID matrix (GUIDs normalized uppercase) – extend if Microsoft adds new ones
         private static readonly Dictionary<string, string> AsrRuleNames = new(StringComparer.OrdinalIgnoreCase)
         {
             { "56A863A9-875E-4185-98A7-B882C64B5CE5", "Block abuse of exploited vulnerable signed drivers" },
@@ -55,7 +54,6 @@ namespace MDE_Monitoring_App.Services
             _defs = LoadDefinitions(out _defsLoaded);
         }
 
-        // Optional: call this (await) at startup or via button to try refreshing ASR mapping from docs.
         public async Task RefreshAsrRuleNamesFromReferenceAsync()
         {
             try
@@ -63,41 +61,40 @@ namespace MDE_Monitoring_App.Services
                 using var client = new HttpClient { Timeout = TimeSpan.FromSeconds(10) };
                 var html = await client.GetStringAsync(AsrReferenceUrl).ConfigureAwait(false);
 
-                // Simple heuristic: look for lines containing both a rule phrase and a GUID.
-                // We map each GUID to the nearest preceding text snippet (fallback keeps current).
                 foreach (Match m in GuidRegex.Matches(html))
                 {
                     var guid = m.Value.ToUpperInvariant();
                     if (AsrRuleNames.ContainsKey(guid)) continue;
 
-                    // Extract a window of text around the GUID to guess name
                     int start = Math.Max(0, m.Index - 160);
                     int len = Math.Min(300, html.Length - start);
                     var window = html.Substring(start, len);
-
-                    // Attempt to grab a phrase ending before GUID
                     var cleaned = Regex.Replace(window, @"\s+", " ").Trim();
-
-                    // Basic title guess: take last sentence-like fragment before GUID
                     string guess = cleaned.Split(guid, StringSplitOptions.RemoveEmptyEntries)[0];
                     var parts = guess.Split(new[] { '.', '>' }, StringSplitOptions.RemoveEmptyEntries);
                     guess = parts.LastOrDefault()?.Trim() ?? "Unlabeled ASR Rule";
-
                     if (guess.Length > 120) guess = guess[^120..];
                     if (string.IsNullOrWhiteSpace(guess)) guess = "Unlabeled ASR Rule";
-
                     AsrRuleNames[guid] = guess;
                 }
             }
             catch
             {
-                // Ignore network / parse errors silently (best-effort)
+                // Best-effort only
             }
         }
 
         private Dictionary<string, DefenderPolicyDefinition> LoadDefinitions(out bool loaded)
         {
             loaded = false;
+
+            var jsonOptions = new JsonSerializerOptions
+            {
+                PropertyNameCaseInsensitive = true,
+                ReadCommentHandling = JsonCommentHandling.Skip,
+                AllowTrailingCommas = true
+            };
+
             string?[] probeBases =
             {
                 AppContext.BaseDirectory,
@@ -113,10 +110,10 @@ namespace MDE_Monitoring_App.Services
                 try
                 {
                     var json = File.ReadAllText(full);
-                    var items = JsonSerializer.Deserialize<List<DefenderPolicyDefinition>>(json,
-                        new JsonSerializerOptions { PropertyNameCaseInsensitive = true }) ?? new();
+                    var items = JsonSerializer.Deserialize<List<DefenderPolicyDefinition>>(json, jsonOptions) ?? new();
                     loaded = true;
                     return items
+                        .Where(d => !string.IsNullOrWhiteSpace(d.Name))
                         .GroupBy(d => d.Name.Trim(), StringComparer.OrdinalIgnoreCase)
                         .ToDictionary(g => g.Key, g => g.First(), StringComparer.OrdinalIgnoreCase);
                 }
@@ -230,7 +227,7 @@ namespace MDE_Monitoring_App.Services
             }
 
             string interpreted = rawStr;
-            string severity = def.DefaultSeverity;
+            string severity = def.DefaultSeverity ?? "Info";
             string kind = def.Kind?.ToLowerInvariant() ?? "raw";
 
             switch (kind)
@@ -241,7 +238,8 @@ namespace MDE_Monitoring_App.Services
                     interpreted = disabled
                         ? def.DisabledMeaning ?? "Disabled"
                         : def.EnabledMeaning ?? "Enabled";
-                    if (disabled) severity = def.RiskWhenDisabled;
+                    if (disabled && !string.IsNullOrEmpty(def.RiskWhenDisabled))
+                        severity = def.RiskWhenDisabled;
                     break;
                 }
                 case "allowflag":
@@ -250,7 +248,8 @@ namespace MDE_Monitoring_App.Services
                     interpreted = enabled
                         ? def.EnabledMeaning ?? "Enabled"
                         : def.DisabledMeaning ?? "Disabled";
-                    if (!enabled) severity = def.RiskWhenDisabled;
+                    if (!enabled && !string.IsNullOrEmpty(def.RiskWhenDisabled))
+                        severity = def.RiskWhenDisabled;
                     break;
                 }
                 case "enum":

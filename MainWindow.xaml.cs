@@ -3,6 +3,7 @@ using System.Threading.Tasks;
 using System.Windows;
 using System.Windows.Controls;
 using System.Windows.Input;
+using System.Windows.Media.Imaging;
 
 namespace MDE_Monitoring_App
 {
@@ -11,7 +12,7 @@ namespace MDE_Monitoring_App
         public MainWindow()
         {
             InitializeComponent();
-
+            Icon = new BitmapImage(new Uri("pack://application:,,,/Resources/microsoft_defender_icon.png"));
             // Ensure DataContext is set so bindings work
             if (DataContext is null)
                 DataContext = new MainViewModel();

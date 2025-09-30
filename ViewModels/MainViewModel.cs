@@ -74,6 +74,21 @@ namespace MDE_Monitoring_App
             }
         }
 
+        private int _logTimeRangeHours = 1;
+        public int LogTimeRangeHours
+        {
+            get => _logTimeRangeHours;
+            set
+            {
+                if (value == _logTimeRangeHours) return;
+                _logTimeRangeHours = value;
+                OnPropertyChanged();
+                LogsView.Refresh();
+            }
+        }
+
+
+
         private string _firewallFilterText = string.Empty;
         public string FirewallFilterText
         {
@@ -207,9 +222,25 @@ namespace MDE_Monitoring_App
 
         private bool LogFilterPredicate(object obj)
         {
-            if (obj is not LogEntry log) return false;
+            if (obj is not LogEntry entry) return false;
+
+            // Time window filter
+            var cutoff = DateTime.Now.AddHours(-LogTimeRangeHours);
+            if (entry.Time < cutoff) return false;
+
+            // Level filter
             if (LogFilter == "All") return true;
-            return log.Level.Equals(LogFilter, StringComparison.OrdinalIgnoreCase);
+            return string.Equals(entry.Level, LogFilter, StringComparison.OrdinalIgnoreCase);
+        }
+
+        public void ReplaceLogs(IEnumerable<LogEntry> newLogs)
+        {
+            Logs.Clear();
+            foreach (var l in newLogs)
+                Logs.Add(l);
+            LastRefreshed = DateTime.Now;
+            OnPropertyChanged(nameof(LastRefreshed));
+            LogsView.Refresh();
         }
 
         private bool FirewallFilter(object obj)
@@ -327,7 +358,7 @@ namespace MDE_Monitoring_App
 
                 // With this line:
                 var dcTask = Task.Run(() => DeviceControlService.LoadLatestDeviceControlEvents());
-                var logsTask = Task.Run(() => _logCollector.GetDefenderLogs(50));
+                var logsTask = Task.Run(() => _logCollector.GetDefenderLogs());
                 var statusTask = Task.Run(_defenderStatusService.GetStatus);
                 var firewallTask = Task.Run(() => _firewallLogService.LoadRecentDrops(200));
                 var policyTask = Task.Run(_policyService.LoadPolicies);
@@ -527,10 +558,10 @@ namespace MDE_Monitoring_App
         }
 
         public event PropertyChangedEventHandler? PropertyChanged;
-        private void OnPropertyChanged([CallerMemberName] string? prop = null) =>
-            PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(prop));
+        private void OnPropertyChanged([CallerMemberName] string? name = null) =>
+            PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(name));
 
-public async Task<bool> ExportPdfAsync(string filePath, CancellationToken ct = default)
+        public async Task<bool> ExportPdfAsync(string filePath, CancellationToken ct = default)
 {
     try
     {

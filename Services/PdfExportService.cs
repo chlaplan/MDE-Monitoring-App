@@ -149,10 +149,11 @@ namespace MDE_Monitoring_App.Services
                     });
 
                 TableSection(col, "Device Control Events", s.DeviceControlEvents,
-                    new[] { "Time", "VID", "PID", "Denied", "Granted" },
+                    new[] { "Time", "InstancePathId", "VID", "PID", "Denied", "Granted" },
                     e => new[]
                     {
-                        e?.Timestamp.ToString("HH:mm:ss") ?? "",
+                        e?.Timestamp.ToString("yyyy-MM-dd HH:mm:ss") ?? "",
+                        e?.InstancePathId ?? "",
                         e?.VID ?? "",
                         e?.PID ?? "",
                         e?.DeniedAccess ?? "",
