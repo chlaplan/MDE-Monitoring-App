@@ -1,0 +1,20 @@
+<PolicyGroups>
+<Group Id="{53b0a69c-54dd-436e-97d3-24d67cffc0ef}">
+  <MatchType>MatchAny</MatchType>
+  <DescriptorIdList>
+    <VID_PID>076B_3021</VID_PID>
+    <VID_PID>05E3_0749</VID_PID>
+    <VID_PID>144D_A80B</VID_PID>
+  </DescriptorIdList>
+</Group><Group Id="{8a984177-78c3-471d-a6ee-936df809a63a}">
+  <MatchType>MatchAny</MatchType>
+  <DescriptorIdList>
+    <PrimaryId>RemovableMediaDevices</PrimaryId>
+    <PrimaryId>WpdDevices</PrimaryId>
+  </DescriptorIdList>
+</Group><Group Id="{974eeb1e-dd76-4059-ac38-fb3bb3bbd894}">
+  <MatchType>MatchAny</MatchType>
+  <DescriptorIdList>
+    <PrimaryId>CdRomDevices</PrimaryId>
+  </DescriptorIdList>
+</Group></PolicyGroups>

@@ -12,6 +12,13 @@
   </PropertyGroup>
 
   <ItemGroup>
+    <Compile Remove="SampleFiles\**" />
+    <EmbeddedResource Remove="SampleFiles\**" />
+    <None Remove="SampleFiles\**" />
+    <Page Remove="SampleFiles\**" />
+  </ItemGroup>
+
+  <ItemGroup>
     <PackageReference Include="Microsoft.PowerShell.SDK" Version="7.5.2" />
     <PackageReference Include="QuestPDF" Version="2025.7.1" />
     <PackageReference Include="System.Management" Version="9.0.8" />
@@ -24,6 +31,10 @@
     <None Include="Data\DefenderPolicyDefinitions.json">
       <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
     </None>
+  </ItemGroup>
+
+  <ItemGroup>
+    <Folder Include="SamplePolicies\" />
   </ItemGroup>
 
 </Project>

@@ -1,23 +1,21 @@
 using System;
 using System.IO;
 using System.Linq;
-using System.Text;
 using System.Collections.Generic;
 using QuestPDF.Fluent;
 using QuestPDF.Helpers;
 using QuestPDF.Infrastructure;
 using MDE_Monitoring_App.Models;
+using MDE_Monitoring_App.Services; // for WfpRuleNameCount
 
 namespace MDE_Monitoring_App.Services
 {
     public class PdfExportService
     {
-        private const int MaxRowsPerSection = 150;   // Adjust as needed
+        private const int MaxRowsPerSection = 150;
 
-        // Ensure license is selected before any document generation.
         static PdfExportService()
         {
-            // Pick the appropriate license for your usage.
             QuestPDF.Settings.License = LicenseType.Community;
         }
 
@@ -34,18 +32,20 @@ namespace MDE_Monitoring_App.Services
             {
                 GeneratedUtc = DateTime.UtcNow,
                 Defender = vm.DefenderStatus ?? new DefenderStatus(),
-                LatestVersions = vm.LatestVersions,   // OK if null, handled later
+                LatestVersions = vm.LatestVersions,
                 PlatformStatusText = vm.PlatformStatusText ?? string.Empty,
                 EngineStatusText = vm.EngineStatusText ?? string.Empty,
                 FirewallEvents = (vm.FirewallEvents ?? Enumerable.Empty<FirewallLogEntry>()).Take(MaxRowsPerSection).Where(e => e != null).ToList()!,
-                DeviceControlEvents = (vm.DeviceControlEvents ?? Enumerable.Empty<DeviceControlEvent>()).Take(MaxRowsPerSection).Where(e => e != null).ToList()!,
-                Policies = (vm.DefenderPolicies ?? Enumerable.Empty<PolicySetting>()).Where(p => p != null).ToList()!,
-                Logs = (vm.Logs ?? Enumerable.Empty<LogEntry>()).Take(MaxRowsPerSection).Where(l => l != null).ToList()!,
-                AppControlEvents = (vm.AppControlEvents ?? Enumerable.Empty<AppControlEvent>()).Take(MaxRowsPerSection).Where(a => a != null).ToList()!,
+                DeviceControlEvents = (vm.DeviceControlEvents ?? new()).Take(MaxRowsPerSection).Where(e => e != null).ToList()!,
+                Policies = (vm.DefenderPolicies ?? new()).Where(p => p != null).ToList()!,
+                Logs = (vm.Logs ?? new()).Take(MaxRowsPerSection).Where(l => l != null).ToList()!,
+                AppControlEvents = (vm.AppControlEvents ?? new()).Take(MaxRowsPerSection).Where(a => a != null).ToList()!,
                 DeviceGuardStatus = vm.DeviceGuardStatus ?? new DeviceGuardStatus(),
                 SystemInfo = vm.CurrentSystem ?? new SystemInfo(),
                 IntuneLastSyncUtc = vm.IntuneLastSyncUtc,
-                FirewallLoggingStatus = vm.FirewallLoggingStatusMessage ?? string.Empty
+                FirewallLoggingStatus = vm.FirewallLoggingStatusMessage ?? string.Empty,
+                WfpFilterCount = vm.WfpFilterCount,
+                WfpRuleCounts = vm.WfpRuleCounts?.ToList() ?? new()
             };
         }
 
@@ -135,6 +135,52 @@ namespace MDE_Monitoring_App.Services
                     });
                 }
 
+                if (s.WfpFilterCount.HasValue)
+                {
+                    var count = s.WfpFilterCount.Value;
+                    var noteColor = Colors.Black;
+                    string text = $"Total WFP Filters: {count:N0}";
+                    if (count >= 50000)
+                    {
+                        text += " (HIGH - consider pruning / investigating policy layering)";
+                        noteColor = Colors.Red.Darken2;
+                    }
+                    else if (count >= 10000)
+                    {
+                        text += " (Large)";
+                        noteColor = Colors.Orange.Darken2;
+                    }
+
+                    Section(col, "WFP Filters", section =>
+                    {
+                        section.Item().Text(text).FontColor(noteColor).SemiBold();
+
+                        if (s.WfpRuleCounts != null && s.WfpRuleCounts.Count > 0)
+                        {
+                            var top = s.WfpRuleCounts.Take(15).ToList();
+                            section.Item().PaddingTop(4).Text("Top Rule Names (by occurrence):").Italic().FontSize(10);
+                            section.Item().Table(t =>
+                            {
+                                t.ColumnsDefinition(cd =>
+                                {
+                                    cd.RelativeColumn(3);
+                                    cd.RelativeColumn(1);
+                                });
+                                t.Header(h =>
+                                {
+                                    h.Cell().Background(Colors.Grey.Lighten2).Padding(2).Text("Rule Name").SemiBold().FontSize(9);
+                                    h.Cell().Background(Colors.Grey.Lighten2).Padding(2).AlignRight().Text("Count").SemiBold().FontSize(9);
+                                });
+                                foreach (var rc in top)
+                                {
+                                    t.Cell().Padding(2).Text(Shorten(rc.Name, 70)).FontSize(8);
+                                    t.Cell().Padding(2).AlignRight().Text(rc.Count.ToString("N0")).FontSize(8);
+                                }
+                            });
+                        }
+                    });
+                }
+
                 TableSection(col, "Firewall Drops", s.FirewallEvents,
                     new[] { "Time", "Proto", "Src", "Dst", "SPort", "DPort", "Info" },
                     e => new[]
@@ -189,8 +235,6 @@ namespace MDE_Monitoring_App.Services
                         l?.Level ?? "",
                         Shorten(l?.Message, 120)
                     });
-
-
             });
         }
 
@@ -217,11 +261,9 @@ namespace MDE_Monitoring_App.Services
                     cc.Item().Table(table =>
                     {
                         var hcount = headers.Length;
-
-                        // Define all columns exactly once (1 index column + header columns)
                         table.ColumnsDefinition(columns =>
                         {
-                            columns.RelativeColumn(); // index #
+                            columns.RelativeColumn();
                             for (int i = 0; i < hcount; i++)
                                 columns.RelativeColumn();
                         });
@@ -243,7 +285,7 @@ namespace MDE_Monitoring_App.Services
                             }
                             catch
                             {
-                                continue; // Skip malformed row
+                                continue;
                             }
 
                             table.Cell().Padding(2).Text(idx++.ToString()).FontSize(8);
@@ -280,6 +322,8 @@ namespace MDE_Monitoring_App.Services
             public SystemInfo SystemInfo { get; set; } = new();
             public DateTime? IntuneLastSyncUtc { get; set; }
             public string FirewallLoggingStatus { get; set; } = "";
+            public int? WfpFilterCount { get; set; }
+            public List<WfpRuleNameCount> WfpRuleCounts { get; set; } = new();
         }
     }
 }

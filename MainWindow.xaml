@@ -1,27 +1,30 @@
 ﻿<Window x:Class="MDE_Monitoring_App.MainWindow"
         xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
-        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml" xmlns:system="clr-namespace:System;assembly=netstandard"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        xmlns:conv="clr-namespace:MDE_Monitoring_App.Converters"
         Title="MDE Monitor" Height="700" Width="1000"
         Icon="/Resources/microsoft_defender_icon.ico"
         WindowStartupLocation="CenterScreen"
         Background="#F3F3F3"
         FontFamily="Segoe UI"
         FontSize="14">
-
+    <Window.Resources>
+        <conv:DescriptorsJoinConverter x:Key="DescriptorsJoinConverter" Separator="; " />
+        <conv:AccessMaskConverter x:Key="AccessMaskConverter" />
+    </Window.Resources>
     <Grid Margin="10">
         <Grid.RowDefinitions>
             <RowDefinition Height="Auto"/>
             <RowDefinition Height="*"/>
         </Grid.RowDefinitions>
 
-        <!-- Header -->
         <TextBlock Text="Microsoft Defender for Endpoint Monitor"
                    FontSize="22" FontWeight="Bold"
                    Foreground="#0078D4"
                    Margin="0,0,0,10"/>
 
-        <!-- Tabs -->
         <TabControl Grid.Row="1">
+
             <!-- Overview Tab -->
             <TabItem Header="Overview">
                 <StackPanel Margin="10">
@@ -194,6 +197,123 @@
                 </Grid>
             </TabItem>
 
+            <!-- Device Control Policies Tab -->
+            <TabItem Header="Device Control Policies">
+                <Grid Margin="10">
+                    <Grid.RowDefinitions>
+                        <RowDefinition Height="Auto"/>
+                        <RowDefinition Height="*"/>
+                        <RowDefinition Height="*"/>
+                    </Grid.RowDefinitions>
+
+                    <StackPanel Orientation="Horizontal" Margin="0,0,0,10">
+                        <TextBlock Text="Device Control Policies"
+                                   FontSize="18"
+                                   FontWeight="Bold"
+                                   Foreground="#0078D4"
+                                   VerticalAlignment="Center"/>
+                        <TextBlock Text="{Binding DeviceControlPolicyStatus}"
+                                   Margin="20,0,0,0"
+                                   VerticalAlignment="Center"
+                                   Foreground="Gray"/>
+                        <Button Content="Refresh"
+                                Margin="20,0,0,0"
+                                Padding="6,2"
+                                Background="#0078D4"
+                                Foreground="White"
+                                Click="RefreshButton_Click"/>
+                    </StackPanel>
+
+                    <!-- Policy Rules -->
+                    <GroupBox Header="Policy Rules" Grid.Row="1" Margin="0,0,0,10">
+                        <DataGrid ItemsSource="{Binding DeviceControlPolicyRules}"
+                                  AutoGenerateColumns="False"
+                                  IsReadOnly="True"
+                                  AlternatingRowBackground="#E6F0FA"
+                                  RowBackground="White"
+                                  FontSize="13"
+                                  RowHeight="26"
+                                  ScrollViewer.VerticalScrollBarVisibility="Auto"
+                                  ScrollViewer.HorizontalScrollBarVisibility="Auto"
+                                  RowDetailsVisibilityMode="VisibleWhenSelected"
+                                  SelectionMode="Single">
+                            <DataGrid.Columns>
+                                <DataGridTextColumn Header="Name" Binding="{Binding Name}" Width="200"/>
+                                <DataGridTextColumn Header="Rule Id" Binding="{Binding Id}" Width="210"/>
+                                <DataGridTextColumn Header="Included Groups" Binding="{Binding IncludedGroupsDisplay}" Width="*"/>
+                                <DataGridTextColumn Header="Excluded Groups" Binding="{Binding ExcludedGroupsDisplay}" Width="*"/>
+                                <DataGridTextColumn Header="Entry Summary" Binding="{Binding EntrySummary}" Width="180"/>
+                            </DataGrid.Columns>
+
+                            <!-- Row details: expanded (dropdown style) when row is selected -->
+                            <DataGrid.RowDetailsTemplate>
+                                <DataTemplate>
+                                    <Border Margin="4" Padding="4" Background="#F9FBFD" BorderBrush="#C8D7E3" BorderThickness="1" CornerRadius="4">
+                                        <DataGrid ItemsSource="{Binding Entries}"
+                                                  AutoGenerateColumns="False"
+                                                  HeadersVisibility="Column"
+                                                  CanUserAddRows="False"
+                                                  CanUserDeleteRows="False"
+                                                  IsReadOnly="True"
+                                                  RowHeight="24"
+                                                  FontSize="12"
+                                                  GridLinesVisibility="Horizontal"
+                                                  ScrollViewer.HorizontalScrollBarVisibility="Auto">
+                                            <DataGrid.Columns>
+                                                <DataGridTextColumn Header="Entry Id" Binding="{Binding Id}" Width="200"/>
+                                                <DataGridTextColumn Header="Type" Binding="{Binding Type}" Width="120"/>
+                                                <DataGridTextColumn Header="Options" Binding="{Binding Options}" Width="80"/>
+                                                <DataGridTextColumn Header="AccessMask"
+                                                                    Binding="{Binding AccessMask, Converter={StaticResource AccessMaskConverter}}"
+                                                                    Width="220"/>
+                                                <DataGridTextColumn Header="Sid" Binding="{Binding Sid}" Width="240"/>
+                                                <DataGridTextColumn Header="ComputerSid" Binding="{Binding ComputerSid}" Width="240"/>
+                                            </DataGrid.Columns>
+                                        </DataGrid>
+                                    </Border>
+                                </DataTemplate>
+                            </DataGrid.RowDetailsTemplate>
+
+                            <!-- Optional styling to visually indicate expandable rows -->
+                            <DataGrid.RowStyle>
+                                <Style TargetType="DataGridRow">
+                                    <Setter Property="Cursor" Value="Hand"/>
+                                    <Setter Property="ToolTip" Value="Select row to expand and view entries"/>
+                                </Style>
+                            </DataGrid.RowStyle>
+                        </DataGrid>
+                    </GroupBox>
+
+                    <!-- Policy Groups -->
+                    <GroupBox Header="Policy Groups" Grid.Row="2">
+                        <DataGrid ItemsSource="{Binding DeviceControlPolicyGroups}"
+                                  AutoGenerateColumns="False"
+                                  IsReadOnly="True"
+                                  AlternatingRowBackground="#E6F0FA"
+                                  RowBackground="White"
+                                  FontSize="13"
+                                  RowHeight="26"
+                                  ScrollViewer.VerticalScrollBarVisibility="Auto"
+                                  ScrollViewer.HorizontalScrollBarVisibility="Auto">
+                            <DataGrid.Columns>
+                                <DataGridTextColumn Header="Group Id" Binding="{Binding Id}" Width="300"/>
+                                <DataGridTextColumn Header="Match Type" Binding="{Binding MatchType}" Width="140"/>
+                                <DataGridTextColumn Header="Descriptors"
+                                                    Width="*"
+                                                    Binding="{Binding Descriptors, Converter={StaticResource DescriptorsJoinConverter}}">
+                                    <DataGridTextColumn.ElementStyle>
+                                        <Style TargetType="TextBlock">
+                                            <Setter Property="TextTrimming" Value="CharacterEllipsis"/>
+                                            <Setter Property="ToolTip" Value="{Binding Descriptors, Converter={StaticResource DescriptorsJoinConverter}}"/>
+                                        </Style>
+                                    </DataGridTextColumn.ElementStyle>
+                                </DataGridTextColumn>
+                            </DataGrid.Columns>
+                        </DataGrid>
+                    </GroupBox>
+                </Grid>
+            </TabItem>
+
             <!-- Firewall Tab -->
             <TabItem Header="Firewall">
                 <!-- unchanged -->
@@ -245,6 +365,7 @@
                                 <Button.Style>
                                     <Style TargetType="Button">
                                         <Setter Property="IsEnabled" Value="True"/>
+                                        <Setter Property="Opacity" Value="1"/>
                                         <Style.Triggers>
                                             <DataTrigger Binding="{Binding FirewallFilterText}" Value="">
                                                 <Setter Property="IsEnabled" Value="False"/>
@@ -287,6 +408,73 @@
                                     </Style>
                                 </DataGridTextColumn.ElementStyle>
                             </DataGridTextColumn>
+                        </DataGrid.Columns>
+                    </DataGrid>
+                </Grid>
+            </TabItem>
+
+            <!-- WFP Filters Tab -->
+            <TabItem Header="WFP Filters">
+                <Grid Margin="10">
+                    <Grid.RowDefinitions>
+                        <RowDefinition Height="Auto"/>
+                        <RowDefinition Height="*"/>
+                    </Grid.RowDefinitions>
+
+                    <StackPanel Orientation="Horizontal" Grid.Row="0" Margin="0,0,0,10">
+                        <TextBlock Text="WFP Filter Summary"
+                           FontSize="18"
+                           FontWeight="Bold"
+                           Foreground="#0078D4"
+                           VerticalAlignment="Center"/>
+                        <TextBlock Margin="20,0,0,0"
+                           VerticalAlignment="Center"
+                           ToolTip="{Binding WfpFilterCountTooltip}">
+                            <TextBlock.Text>
+                                <Binding Path="WfpFilterCount"
+                                 TargetNullValue="Total: Unknown"
+                                 StringFormat="Total: {0:N0}"/>
+                            </TextBlock.Text>
+                            <TextBlock.Style>
+                                <Style TargetType="TextBlock">
+                                    <Setter Property="Foreground" Value="Black"/>
+                                    <Style.Triggers>
+                                        <DataTrigger Binding="{Binding WfpFilterCountStatus}" Value="Unknown">
+                                            <Setter Property="Foreground" Value="Gray"/>
+                                        </DataTrigger>
+                                        <DataTrigger Binding="{Binding WfpFilterCountStatus}" Value="Large">
+                                            <Setter Property="Foreground" Value="Goldenrod"/>
+                                            <Setter Property="FontWeight" Value="SemiBold"/>
+                                        </DataTrigger>
+                                        <DataTrigger Binding="{Binding WfpFilterCountStatus}" Value="High">
+                                            <Setter Property="Foreground" Value="Red"/>
+                                            <Setter Property="FontWeight" Value="Bold"/>
+                                        </DataTrigger>
+                                    </Style.Triggers>
+                                </Style>
+                            </TextBlock.Style>
+                        </TextBlock>
+                        <Button Content="Refresh"
+                        Click="RefreshButton_Click"
+                        Margin="20,0,0,0"
+                        Background="#0078D4"
+                        Foreground="White"
+                        Padding="6,2"/>
+                    </StackPanel>
+
+                    <DataGrid Grid.Row="1"
+                      ItemsSource="{Binding WfpRuleCounts}"
+                      AutoGenerateColumns="False"
+                      IsReadOnly="True"
+                      AlternatingRowBackground="#E6F0FA"
+                      RowBackground="White"
+                      FontSize="13"
+                      RowHeight="26"
+                      ScrollViewer.VerticalScrollBarVisibility="Auto"
+                      ScrollViewer.HorizontalScrollBarVisibility="Auto">
+                        <DataGrid.Columns>
+                            <DataGridTextColumn Header="Rule Name" Binding="{Binding Name}" Width="*"/>
+                            <DataGridTextColumn Header="Count" Binding="{Binding Count}" Width="120"/>
                         </DataGrid.Columns>
                     </DataGrid>
                 </Grid>

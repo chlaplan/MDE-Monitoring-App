@@ -26,6 +26,14 @@ namespace MDE_Monitoring_App
             }
         }
 
+        private async Task RefreshDeviceControlPoliciesAsync()
+        {
+            if (DataContext is MainViewModel vm)
+            {
+                var status = vm.DeviceControlPolicyStatus;
+            }
+        }
+
         private void ClearFirewallFilter_Click(object sender, RoutedEventArgs e)
         {
             if (DataContext is MainViewModel vm)

@@ -24,8 +24,12 @@ namespace MDE_Monitoring_App
         private readonly AppControlStatusService _appControlStatusService = new();
         private readonly AppControlLogService _appControlLogService = new();
         private readonly DeviceGuardStatusService _deviceGuardStatusService = new();
+        private readonly WfpFilterService _wfpFilterService = new(WfpFilterCountMode.LegacyDoubleNameHeuristic, preserveXmlForDebug: true);
+        private readonly DeviceControlPolicyService _deviceControlPolicyService = new(); // NEW
 
         public ObservableCollection<LogEntry> Logs { get; } = new();
+        public ObservableCollection<DeviceControlPolicyGroup>? DeviceControlPolicyGroups { get; private set; } // NEW (already declared earlier in planning)
+        public ObservableCollection<DeviceControlPolicyRule>? DeviceControlPolicyRules { get; private set; }   // NEW
         private ObservableCollection<DeviceControlEvent> _deviceControlEvents = new();
         public ObservableCollection<DeviceControlEvent> DeviceControlEvents
         {
@@ -36,6 +40,15 @@ namespace MDE_Monitoring_App
         public ObservableCollection<FirewallLogEntry> FirewallEvents { get; } = new();
         public ObservableCollection<PolicySetting> DefenderPolicies { get; } = new();
         public ObservableCollection<AppControlEvent> AppControlEvents { get; } = new();
+        public ObservableCollection<WfpRuleNameCount> WfpRuleCounts { get; } = new();
+
+        // NEW: Status text for Device Control Policies loading
+        private string? _deviceControlPolicyStatus = "Not loaded";
+        public string? DeviceControlPolicyStatus
+        {
+            get => _deviceControlPolicyStatus;
+            set { if (_deviceControlPolicyStatus != value) { _deviceControlPolicyStatus = value; OnPropertyChanged(); } }
+        }
 
         public ICollectionView LogsView { get; }
         public ICollectionView FirewallView { get; }
@@ -87,8 +100,6 @@ namespace MDE_Monitoring_App
             }
         }
 
-
-
         private string _firewallFilterText = string.Empty;
         public string FirewallFilterText
         {
@@ -119,7 +130,6 @@ namespace MDE_Monitoring_App
             }
         }
 
-        // Backing fields & public (safe) writable properties
         private string _platformStatusText = "Unknown";
         private string _engineStatusText = "Unknown";
 
@@ -128,7 +138,6 @@ namespace MDE_Monitoring_App
             get => _platformStatusText;
             set
             {
-                // Ignore external TwoWay writes; recompute to maintain consistency
                 var computed = BuildStatusText(DefenderStatus.AMProductVersion, LatestVersions?.PlatformVersion, PlatformUpToDate);
                 if (_platformStatusText != computed)
                 {
@@ -152,15 +161,13 @@ namespace MDE_Monitoring_App
             }
         }
 
-        // Computed health booleans (kept for triggers / other logic)
         public bool PlatformUpToDate => IsUpToDate(DefenderStatus.AMProductVersion, LatestVersions?.PlatformVersion);
         public bool EngineUpToDate => IsUpToDate(DefenderStatus.AMEngineVersion, LatestVersions?.EngineVersion);
 
         private void RaiseVersionProps()
         {
-            // Recompute text first
             var newPlat = BuildStatusText(DefenderStatus.AMProductVersion, LatestVersions?.PlatformVersion, PlatformUpToDate);
-            var newEng  = BuildStatusText(DefenderStatus.AMEngineVersion,   LatestVersions?.EngineVersion,   EngineUpToDate);
+            var newEng = BuildStatusText(DefenderStatus.AMEngineVersion, LatestVersions?.EngineVersion, EngineUpToDate);
 
             if (_platformStatusText != newPlat)
             {
@@ -179,7 +186,7 @@ namespace MDE_Monitoring_App
 
         private static bool IsUpToDate(string? local, string? latest)
         {
-            if (string.IsNullOrWhiteSpace(local) || string.IsNullOrWhiteSpace(latest)) return true; // treat unknown latest as neutral (won't show red)
+            if (string.IsNullOrWhiteSpace(local) || string.IsNullOrWhiteSpace(latest)) return true;
             if (!Version.TryParse(Normalize(local), out var lv)) return true;
             if (!Version.TryParse(Normalize(latest), out var rv)) return true;
             return lv >= rv;
@@ -189,7 +196,7 @@ namespace MDE_Monitoring_App
         {
             if (string.IsNullOrWhiteSpace(local)) return "Unknown";
             if (latest == null || latest.Length == 0)
-                return local + " (Unavailable)"; // failed or not parsed
+                return local + " (Unavailable)";
             if (upToDate) return $"{local} (Up to date)";
             return $"{local} (Out of date → Latest {latest})";
         }
@@ -223,12 +230,8 @@ namespace MDE_Monitoring_App
         private bool LogFilterPredicate(object obj)
         {
             if (obj is not LogEntry entry) return false;
-
-            // Time window filter
             var cutoff = DateTime.Now.AddHours(-LogTimeRangeHours);
             if (entry.Time < cutoff) return false;
-
-            // Level filter
             if (LogFilter == "All") return true;
             return string.Equals(entry.Level, LogFilter, StringComparison.OrdinalIgnoreCase);
         }
@@ -274,7 +277,6 @@ namespace MDE_Monitoring_App
                 {
                     _latestFetchState = value;
                     OnPropertyChanged();
-                    // Recompute text if state affects wording
                     RaiseVersionProps();
                 }
             }
@@ -306,13 +308,13 @@ namespace MDE_Monitoring_App
         public string IntuneLastSyncLocalDisplay
         {
             get => _intuneLastSyncUtc.HasValue ? _intuneLastSyncUtc.Value.ToLocalTime().ToString("G") : "Unknown";
-            set { /* ignore incoming writes to keep read-only semantics */ }
+            set { }
         }
 
         public string IntuneLastSyncUtcDisplay
         {
             get => _intuneLastSyncUtc.HasValue ? _intuneLastSyncUtc.Value.ToString("u") : "Unknown";
-            set { /* ignore */ }
+            set { }
         }
 
         private DeviceGuardStatus _deviceGuardStatus = new();
@@ -337,11 +339,9 @@ namespace MDE_Monitoring_App
 
         private async Task<DeviceGuardStatus> LoadDeviceGuardStatusAsync()
         {
-            // Slightly artificial delay to simulate real-world async data loading
             await Task.Delay(500).ConfigureAwait(false);
             return new DeviceGuardStatus
             {
-                // Only set writable properties, not read-only display properties
                 CodeIntegrityPolicyEnforcementStatus = 1,
                 VirtualizationBasedSecurityStatus = 1,
                 SecurityServicesConfigured = new uint[] { 1 },
@@ -349,37 +349,73 @@ namespace MDE_Monitoring_App
             };
         }
 
+        private int? _wfpFilterCount;
+        public int? WfpFilterCount
+        {
+            get => _wfpFilterCount;
+            set
+            {
+                if (value == _wfpFilterCount) return;
+                _wfpFilterCount = value;
+                OnPropertyChanged();
+                OnPropertyChanged(nameof(WfpFilterCountStatus));
+                OnPropertyChanged(nameof(WfpFilterCountTooltip));
+            }
+        }
+
+        public string WfpFilterCountStatus
+        {
+            get
+            {
+                if (!WfpFilterCount.HasValue) return "Unknown";
+                if (WfpFilterCount.Value >= 50000) return "High";
+                if (WfpFilterCount.Value >= 10000) return "Large";
+                return "Normal";
+            }
+        }
+
+        public string WfpFilterCountTooltip =>
+            WfpFilterCountStatus switch
+            {
+                "High" => ">= 50,000 filters: potential performance / manageability impact.",
+                "Large" => ">= 10,000 filters: elevated count – monitor growth.",
+                "Normal" => "Filter count within typical range.",
+                _ => "Filter count not available."
+            };
+
         public async Task RefreshDataAsync()
         {
             try
             {
-                // Replace this line:
-                // var dcTask = Task.Run(DeviceControlService.LoadLatestDeviceControlEvents);
-
-                // With this line:
+                // Existing parallel loads
                 var dcTask = Task.Run(() => DeviceControlService.LoadLatestDeviceControlEvents());
                 var logsTask = Task.Run(() => _logCollector.GetDefenderLogs());
                 var statusTask = Task.Run(_defenderStatusService.GetStatus);
                 var firewallTask = Task.Run(() => _firewallLogService.LoadRecentDrops(200));
+                var wfpTask = _wfpFilterService.GetFilterSummaryAsync();
                 var policyTask = Task.Run(_policyService.LoadPolicies);
                 var latestTask = _latestVersionService.GetLatestAsync();
                 var intuneSyncTask = Task.Run(_intuneSyncService.GetLastSync);
                 var appControlStatusTask = Task.Run(_appControlStatusService.GetStatus);
                 var appControlLogsTask = Task.Run(() => _appControlLogService.GetRecent(150));
-                //var deviceGuardStatusTask = Task.Run(LoadDeviceGuardStatusAsync);
                 var deviceGuardTask = Task.Run(_deviceGuardStatusService.GetStatus);
+                DeviceControlPolicyStatus = "Loading..."; // NEW
+                var dcPoliciesTask = _deviceControlPolicyService.GetSnapshotAsync(
+                    fallbackGroupsFile: "SamplePolicies/PolicyGroups.txt",
+                    fallbackRulesFile: "SamplePolicies/PolicyRules.txt");
 
                 var dcEvents = await dcTask.ConfigureAwait(false);
                 var newLogs = await logsTask.ConfigureAwait(false);
                 var newStatus = await statusTask.ConfigureAwait(false);
                 var fwEvents = await firewallTask.ConfigureAwait(false);
+                var wfpSummary = await wfpTask.ConfigureAwait(false);
                 var policies = await policyTask.ConfigureAwait(false);
                 var latest = await latestTask.ConfigureAwait(false);
                 var intuneLastSync = await intuneSyncTask.ConfigureAwait(false);
                 var appControlStatus = await appControlStatusTask.ConfigureAwait(false);
                 var appControlLogs = await appControlLogsTask.ConfigureAwait(false);
-                //var deviceGuardStatus = await deviceGuardStatusTask.ConfigureAwait(false);
                 var deviceGuardStatus = await deviceGuardTask.ConfigureAwait(false);
+                var dcPoliciesSnapshot = await dcPoliciesTask.ConfigureAwait(false); // NEW
 
                 App.Current.Dispatcher.Invoke(() =>
                 {
@@ -410,19 +446,44 @@ namespace MDE_Monitoring_App
                     CurrentSystem.IPAddress = GetLocalIPAddress();
                     CurrentSystem.JoinType = GetAADJoinType();
 
-                    // With the following, using the correct variable names:
                     LatestVersions = latest.versions;
                     LatestFetchState = latest.state;
                     LatestFetchError = latest.error;
                     IntuneLastSyncUtc = intuneLastSync;
 
-                    // In your RefreshDataAsync method, replace this line:
                     AppControlStatus = appControlStatus;
 
                     AppControlEvents.Clear();
                     foreach (var ev in appControlLogs) AppControlEvents.Add(ev);
 
                     DeviceGuardStatus = deviceGuardStatus;
+
+                    if (wfpSummary != null)
+                    {
+                        WfpFilterCount = (int?)wfpSummary.TotalFilterCount;
+                        WfpRuleCounts.Clear();
+                        foreach (var rc in wfpSummary.RuleCounts)
+                            WfpRuleCounts.Add(rc);
+                    }
+                    else
+                    {
+                        WfpFilterCount = null;
+                        WfpRuleCounts.Clear();
+                    }
+
+                    // NEW: Device Control Policies integration
+                    if (dcPoliciesSnapshot != null)
+                    {
+                        DeviceControlPolicyGroups = new ObservableCollection<DeviceControlPolicyGroup>(dcPoliciesSnapshot.Groups);
+                        DeviceControlPolicyRules = new ObservableCollection<DeviceControlPolicyRule>(dcPoliciesSnapshot.Rules);
+                        OnPropertyChanged(nameof(DeviceControlPolicyGroups));
+                        OnPropertyChanged(nameof(DeviceControlPolicyRules));
+                        DeviceControlPolicyStatus = $"Groups: {dcPoliciesSnapshot.Groups.Count} | Rules: {dcPoliciesSnapshot.Rules.Count}";
+                    }
+                    else
+                    {
+                        DeviceControlPolicyStatus = "No policy data";
+                    }
 
                     LastRefreshed = DateTime.Now;
                     LogsView.Refresh();
@@ -438,6 +499,7 @@ namespace MDE_Monitoring_App
                         Level = "Error",
                         Message = $"Failed to refresh: {ex.Message}"
                     });
+                    DeviceControlPolicyStatus = "Failed to load"; // NEW
                 });
             }
         }
@@ -511,7 +573,6 @@ namespace MDE_Monitoring_App
             }
         }
         private string _firewallLoggingStatusMessage = string.Empty;
-        // Add this property to your MainViewModel class
         private AppControlStatus _appControlStatus = new();
 
         public bool ShowFirewallLoggingStatusMessage => !string.IsNullOrEmpty(FirewallLoggingStatusMessage);
@@ -540,11 +601,11 @@ namespace MDE_Monitoring_App
 
             if (!noDropped.Any() && !noAllowed.Any())
             {
-                FirewallLoggingStatusMessage = string.Empty; // All good, hide message
+                FirewallLoggingStatusMessage = string.Empty;
                 return;
             }
 
-            var parts = new List<string>();
+            var parts = new System.Collections.Generic.List<string>();
             if (noDropped.Any())
                 parts.Add("Dropped packet logging disabled for: " + string.Join(", ", noDropped));
             if (noAllowed.Any())
@@ -562,19 +623,18 @@ namespace MDE_Monitoring_App
             PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(name));
 
         public async Task<bool> ExportPdfAsync(string filePath, CancellationToken ct = default)
-{
-    try
-    {
-        var exporter = new PdfExportService();
-        // Heavy work off UI thread
-        var bytes = await Task.Run(() => exporter.BuildReport(this), ct).ConfigureAwait(false);
-        await File.WriteAllBytesAsync(filePath, bytes, ct).ConfigureAwait(false);
-        return true;
-    }
-    catch
-    {
-        return false;
-    }
-}
+        {
+            try
+            {
+                var exporter = new PdfExportService();
+                var bytes = await Task.Run(() => exporter.BuildReport(this), ct).ConfigureAwait(false);
+                await File.WriteAllBytesAsync(filePath, bytes, ct).ConfigureAwait(false);
+                return true;
+            }
+            catch
+            {
+                return false;
+            }
+        }
     }
 }

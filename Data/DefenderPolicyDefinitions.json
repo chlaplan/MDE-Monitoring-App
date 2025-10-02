@@ -32,6 +32,18 @@
 
   /* ================= DEVICE CONTROL ================= */
   { "Name": "DefaultEnforcement", "DisplayName": "Device Control Default Enforcement", "Description": "Baseline mode: 0=Unspecified,1=Enabled,2=Audit,3=Warn.", "Kind": "enum", "EnumMap": { "0": "Unspecified", "1": "Enabled", "2": "Audit", "3": "Warn" } },
+  {
+    "Name": "PolicyGroups",
+    "DisplayName": "Device Control Groups",
+    "Description": "Defines collections of devices based on attributes such as hardware IDs, instance paths, or setup class GUIDs. These groups serve as the scope for applying access control rules in device control policies (e.g., 'Removable Media Devices').",
+    "Kind": "raw"
+  },
+  {
+    "Name": "PolicyRules",
+    "DisplayName": "Device Control Policy Rules",
+    "Description": "Defines access control rules for device groups, specifying allowed, denied, or audited operations. Each rule links device identifiers to enforcement actions and default behaviors, enabling granular control over peripheral device usage.",
+    "Kind": "raw"
+  },
 
   /* ================= REMOVABLE / NETWORK / MAPPED DRIVES ================= */
   { "Name": "DisableRemovableDriveScanning", "DisplayName": "Removable Drive Scanning (Legacy Disable)", "Description": "Legacy disable flag for removable media scanning.", "Kind": "disableFlag", "EnabledMeaning": "Enabled", "DisabledMeaning": "Disabled", "RiskWhenDisabled": "Info" },
