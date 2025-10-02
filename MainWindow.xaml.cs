@@ -2,7 +2,9 @@
 using System.Threading.Tasks;
 using System.Windows;
 using System.Windows.Controls;
+using System.Windows.Controls.Primitives;
 using System.Windows.Input;
+using System.Windows.Media;
 using System.Windows.Media.Imaging;
 
 namespace MDE_Monitoring_App
@@ -68,6 +70,44 @@ namespace MDE_Monitoring_App
             finally
             {
                 Mouse.OverrideCursor = null;
+            }
+        }
+
+        private void PolicyRulesGrid_PreviewMouseLeftButtonDown(object sender, MouseButtonEventArgs e)
+        {
+            if (sender is not DataGrid grid) return;
+
+            var dep = (DependencyObject)e.OriginalSource;
+
+            // Ignore header clicks
+            while (dep != null && dep is not DataGridRow && dep is not DataGridColumnHeader)
+                dep = VisualTreeHelper.GetParent(dep);
+
+            if (dep is DataGridColumnHeader) return;
+            if (dep is not DataGridRow row) return;
+
+            // Toggle this row's details
+            if (row.DetailsVisibility == Visibility.Visible)
+            {
+                row.DetailsVisibility = Visibility.Collapsed;
+                e.Handled = true;
+            }
+            else
+            {
+                // (Optional) collapse any other open rows so only one is open
+                foreach (var item in grid.Items)
+                {
+                    if (grid.ItemContainerGenerator.ContainerFromItem(item) is DataGridRow r &&
+                        r != row &&
+                        r.DetailsVisibility == Visibility.Visible)
+                    {
+                        r.DetailsVisibility = Visibility.Collapsed;
+                    }
+                }
+
+                row.DetailsVisibility = Visibility.Visible;
+                row.IsSelected = true;
+                e.Handled = true;
             }
         }
     }

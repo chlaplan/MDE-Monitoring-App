@@ -225,18 +225,21 @@
                     </StackPanel>
 
                     <!-- Policy Rules -->
+                    <!-- REPLACE ONLY the Policy Rules DataGrid opening tag and closing tag block with this updated version -->
                     <GroupBox Header="Policy Rules" Grid.Row="1" Margin="0,0,0,10">
-                        <DataGrid ItemsSource="{Binding DeviceControlPolicyRules}"
-                                  AutoGenerateColumns="False"
-                                  IsReadOnly="True"
-                                  AlternatingRowBackground="#E6F0FA"
-                                  RowBackground="White"
-                                  FontSize="13"
-                                  RowHeight="26"
-                                  ScrollViewer.VerticalScrollBarVisibility="Auto"
-                                  ScrollViewer.HorizontalScrollBarVisibility="Auto"
-                                  RowDetailsVisibilityMode="VisibleWhenSelected"
-                                  SelectionMode="Single">
+                        <DataGrid x:Name="PolicyRulesGrid"
+              ItemsSource="{Binding DeviceControlPolicyRules}"
+              AutoGenerateColumns="False"
+              IsReadOnly="True"
+              AlternatingRowBackground="#E6F0FA"
+              RowBackground="White"
+              FontSize="13"
+              RowHeight="26"
+              ScrollViewer.VerticalScrollBarVisibility="Auto"
+              ScrollViewer.HorizontalScrollBarVisibility="Auto"
+              RowDetailsVisibilityMode="Collapsed"    
+                            SelectionMode="Single"
+              PreviewMouseLeftButtonDown="PolicyRulesGrid_PreviewMouseLeftButtonDown">
                             <DataGrid.Columns>
                                 <DataGridTextColumn Header="Name" Binding="{Binding Name}" Width="200"/>
                                 <DataGridTextColumn Header="Rule Id" Binding="{Binding Id}" Width="210"/>
@@ -245,40 +248,38 @@
                                 <DataGridTextColumn Header="Entry Summary" Binding="{Binding EntrySummary}" Width="180"/>
                             </DataGrid.Columns>
 
-                            <!-- Row details: expanded (dropdown style) when row is selected -->
                             <DataGrid.RowDetailsTemplate>
                                 <DataTemplate>
                                     <Border Margin="4" Padding="4" Background="#F9FBFD" BorderBrush="#C8D7E3" BorderThickness="1" CornerRadius="4">
                                         <DataGrid ItemsSource="{Binding Entries}"
-                                                  AutoGenerateColumns="False"
-                                                  HeadersVisibility="Column"
-                                                  CanUserAddRows="False"
-                                                  CanUserDeleteRows="False"
-                                                  IsReadOnly="True"
-                                                  RowHeight="24"
-                                                  FontSize="12"
-                                                  GridLinesVisibility="Horizontal"
-                                                  ScrollViewer.HorizontalScrollBarVisibility="Auto">
+                              AutoGenerateColumns="False"
+                              HeadersVisibility="Column"
+                              CanUserAddRows="False"
+                              CanUserDeleteRows="False"
+                              IsReadOnly="True"
+                              RowHeight="24"
+                              FontSize="12"
+                              GridLinesVisibility="Horizontal"
+                              ScrollViewer.HorizontalScrollBarVisibility="Auto">
                                             <DataGrid.Columns>
                                                 <DataGridTextColumn Header="Entry Id" Binding="{Binding Id}" Width="200"/>
                                                 <DataGridTextColumn Header="Type" Binding="{Binding Type}" Width="120"/>
                                                 <DataGridTextColumn Header="Options" Binding="{Binding Options}" Width="80"/>
                                                 <DataGridTextColumn Header="AccessMask"
-                                                                    Binding="{Binding AccessMask, Converter={StaticResource AccessMaskConverter}}"
-                                                                    Width="220"/>
+                                                Binding="{Binding AccessMask, Converter={StaticResource AccessMaskConverter}}"
+                                                Width="220"/>
                                                 <DataGridTextColumn Header="Sid" Binding="{Binding Sid}" Width="240"/>
-                                                <DataGridTextColumn Header="ComputerSid" Binding="{Binding ComputerSid}" Width="240"/>
+                                                <DataGridTextColumn Header="ComputerSid" Binding="{Binding ComputerSidDisplay}" Width="260"/>
                                             </DataGrid.Columns>
                                         </DataGrid>
                                     </Border>
                                 </DataTemplate>
                             </DataGrid.RowDetailsTemplate>
 
-                            <!-- Optional styling to visually indicate expandable rows -->
                             <DataGrid.RowStyle>
                                 <Style TargetType="DataGridRow">
                                     <Setter Property="Cursor" Value="Hand"/>
-                                    <Setter Property="ToolTip" Value="Select row to expand and view entries"/>
+                                    <Setter Property="ToolTip" Value="Click to expand / collapse entries"/>
                                 </Style>
                             </DataGrid.RowStyle>
                         </DataGrid>
