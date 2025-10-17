@@ -65,7 +65,7 @@ Static in code with optional (best‑effort) runtime enrichment from Microsoft r
 ---
 
 ## Screenshots
-![Overview](Screenshots/overview.jpg)
+![Overview](Screenshots/Overview.jpg)
 
 | Tab | Description |
 |-----|-------------|
