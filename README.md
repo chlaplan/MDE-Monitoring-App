@@ -64,7 +64,9 @@ Static in code with optional (best‑effort) runtime enrichment from Microsoft r
 
 ---
 
-## Screenshots 
+## Screenshots
+![Overview](Screenshots/overview.jpg)
+
 | Tab | Description |
 |-----|-------------|
 | Overview | Core Defender status summary |
