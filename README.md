@@ -75,7 +75,6 @@ Static in code with optional (best‑effort) runtime enrichment from Microsoft r
 | Policies | Interpreted policy matrix |
 | Logs | Defender operational events |
 
-(Add real screenshots before publishing.)
 
 ---
 
