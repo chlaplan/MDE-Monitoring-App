@@ -64,7 +64,9 @@ Static in code with optional (best‑effort) runtime enrichment from Microsoft r
 
 ---
 
-## Screenshots (Placeholder)
+## Screenshots
+![Overview](Screenshots/Overview.jpg)
+
 | Tab | Description |
 |-----|-------------|
 | Overview | Core Defender status summary |
@@ -73,7 +75,6 @@ Static in code with optional (best‑effort) runtime enrichment from Microsoft r
 | Policies | Interpreted policy matrix |
 | Logs | Defender operational events |
 
-(Add real screenshots before publishing.)
 
 ---
 
@@ -111,7 +112,7 @@ Threading:
 ### Steps
 1. Clone repository
 2. Ensure `Data\DefenderPolicyDefinitions.json` is marked to “Copy to Output (PreserveNewest)"
-3. Build solution in VS 2022
+3. Build solution in VS
 4. Run **as Administrator** (UAC prompt) to enable full feature set
 
 ### Optional Manifest Elevation
