@@ -1,11 +1,11 @@
-using System;
-using System.IO;
-using System.Linq;
-using System.Collections.Generic;
+using MDE_Monitoring_App.Models;
 using QuestPDF.Fluent;
 using QuestPDF.Helpers;
 using QuestPDF.Infrastructure;
-using MDE_Monitoring_App.Models;
+using System;
+using System.Collections.Generic;
+using System.Collections.ObjectModel;
+using System.Linq;
 
 namespace MDE_Monitoring_App.Services
 {
@@ -22,43 +22,56 @@ namespace MDE_Monitoring_App.Services
         {
             if (vm == null) throw new ArgumentNullException(nameof(vm));
             var snapshot = TakeSnapshot(vm);
-            return Document(snapshot).GeneratePdf();
+            return QuestPDF.Fluent.GenerateExtensions.GeneratePdf(BuildDocument(snapshot) as QuestPDF.Infrastructure.IDocument);
         }
 
-        private static Snapshot TakeSnapshot(MainViewModel vm)
+        private static Snapshot TakeSnapshot(MainViewModel vm) => new()
         {
-            return new Snapshot
-            {
-                GeneratedUtc = DateTime.UtcNow,
-                Defender = vm.DefenderStatus ?? new DefenderStatus(),
-                LatestVersions = vm.LatestVersions,
-                PlatformStatusText = vm.PlatformStatusText ?? string.Empty,
-                EngineStatusText = vm.EngineStatusText ?? string.Empty,
-                FirewallEvents = (vm.FirewallEvents ?? Enumerable.Empty<FirewallLogEntry>()).Take(MaxRowsPerSection).Where(e => e != null).ToList()!,
-                DeviceControlEvents = (vm.DeviceControlEvents ?? new()).Take(MaxRowsPerSection).Where(e => e != null).ToList()!,
-                Policies = (vm.DefenderPolicies ?? new()).Where(p => p != null).ToList()!,
-                Logs = (vm.Logs ?? new()).Take(MaxRowsPerSection).Where(l => l != null).ToList()!,
-                AppControlEvents = (vm.AppControlEvents ?? new()).Take(MaxRowsPerSection).Where(a => a != null).ToList()!,
-                DeviceGuardStatus = vm.DeviceGuardStatus ?? new DeviceGuardStatus(),
-                SystemInfo = vm.CurrentSystem ?? new SystemInfo(),
-                IntuneLastSyncUtc = vm.IntuneLastSyncUtc,
-                FirewallLoggingStatus = vm.FirewallLoggingStatusMessage ?? string.Empty,
-                WfpFilterCount = vm.WfpFilterCount,
-                WfpRuleCounts = vm.WfpRuleCounts?.ToList() ?? new(),
-                IsRemote = vm.IsRemote,
-                TargetMachine = vm.TargetMachine,
-                WfpDiagnostics = vm.WfpFilterCount.HasValue ? null : "WFP summary unavailable (permission or remote unsupported)." // simple hint
-            };
-        }
+            GeneratedUtc = DateTime.UtcNow,
+            Defender = vm.DefenderStatus ?? new(),
+            LatestVersions = vm.LatestVersions,
+            PlatformStatusText = vm.PlatformStatusText ?? "",
+            EngineStatusText = vm.EngineStatusText ?? "",
+            PlatformUpToDate = vm.PlatformUpToDate,
+            EngineUpToDate = vm.EngineUpToDate,
+            LatestFetchState = vm.LatestFetchState,
+            LatestFetchError = vm.LatestFetchError ?? "",
+            FirewallEvents = (vm.FirewallEvents != null ? vm.FirewallEvents : new ObservableCollection<FirewallLogEntry>()).Take(MaxRowsPerSection).ToList(),
+            DeviceControlEvents = (vm.DeviceControlEvents ?? new()).Take(MaxRowsPerSection).ToList(),
+            Policies = (vm.DefenderPolicies ?? new()).Take(MaxRowsPerSection).ToList(),
+            Logs = (vm.Logs ?? new()).Take(MaxRowsPerSection).ToList(),
+            AppControlEvents = (vm.AppControlEvents ?? new()).Take(MaxRowsPerSection).ToList(),
+            AppControlStatus = vm.AppControlStatus ?? new(),
+            DeviceGuardStatus = vm.DeviceGuardStatus ?? new(),
+            SystemInfo = vm.CurrentSystem ?? new(),
+            IntuneLastSyncUtc = vm.IntuneLastSyncUtc,
+            IntuneEnrollmentStatus = vm.IntuneEnrollmentStatus,
+            IntuneEnrollmentUpn = vm.IntuneEnrollmentUpn,
+            IntuneEnrollmentState = vm.IntuneEnrollmentState,
+            FirewallLoggingStatus = vm.FirewallLoggingStatusMessage ?? "",
+            FirewallProfilesMultiline = vm.FirewallProfilesMultilineDisplay ?? "",
+            DeviceControlPolicyStatus = vm.DeviceControlPolicyStatus ?? "",
+            DeviceControlPolicyGroupsCount = vm.DeviceControlPolicyGroups?.Count ?? 0,
+            DeviceControlPolicyRulesCount = vm.DeviceControlPolicyRules?.Count ?? 0,
+            WfpFilterCount = vm.WfpFilterCount,
+            WfpRuleCounts = vm.WfpRuleCounts?.ToList() ?? new(),
+            WfpModeDiagnostics = vm.WfpModeDiagnostics ?? "",
+            WfpRemoteStatusNote = vm.WfpRemoteStatusNote ?? "",
+            IsRemote = vm.IsRemote,
+            TargetMachine = vm.TargetMachine,
+            RemoteCapabilityStatus = RemoteCapabilityStatusCache ?? "",
+            WfpDiagnostics = !vm.WfpFilterCount.HasValue ? "WFP summary unavailable (permission / remote limitation)." : null,
+            TamperProtectionDisplay = vm.DefenderStatus?.TamperProtectionDisplay ?? "Tamper Protection: Unknown"
+        };
 
-        private static Document Document(Snapshot s) =>
+        private static QuestPDF.Infrastructure.IDocument BuildDocument(Snapshot s) =>
             QuestPDF.Fluent.Document.Create(container =>
             {
                 container.Page(page =>
                 {
                     page.Margin(40);
-                    page.Header().Element(c => Header(c, s));
-                    page.Content().PaddingTop(10).Element(c => Body(c, s));
+                    page.Header().Element(c => RenderHeader(c, s));
+                    page.Content().PaddingTop(10).Element(c => RenderBody(c, s));
                     page.Footer().AlignCenter().Text(x =>
                     {
                         x.Span("Generated: ").SemiBold();
@@ -70,100 +83,119 @@ namespace MDE_Monitoring_App.Services
                 });
             });
 
-        private static void Header(IContainer c, Snapshot s)
+        private static void RenderHeader(IContainer c, Snapshot s)
         {
             var sys = s.SystemInfo ?? new SystemInfo();
             c.Row(r =>
             {
                 r.RelativeItem().Column(col =>
                 {
-                    col.Item().Text("MDE / Endpoint Security Summary").FontSize(18).SemiBold().FontColor(Colors.Blue.Medium);
-                    col.Item().Text($"Source: {(s.IsRemote ? "Remote" : "Local")} {(s.IsRemote ? "(" + (s.TargetMachine ?? "") + ")" : "")}"); // PHASE6
-                    col.Item().Text($"Machine: {sys.MachineName ?? ""}");
-                    col.Item().Text($"User: {sys.CurrentUser ?? ""}");
+                    col.Item().Text("Endpoint Security Summary").FontSize(18).SemiBold().FontColor(Colors.Blue.Medium);
+                    col.Item().Text($"Source: {(s.IsRemote ? "Remote" : "Local")}{(s.IsRemote ? $" ({s.TargetMachine})" : "")}");
+                    col.Item().Text($"Machine: {sys.MachineName}");
+                    col.Item().Text($"User: {sys.CurrentUser}");
                     col.Item().Text($"Platform: {s.PlatformStatusText}");
                     col.Item().Text($"Engine: {s.EngineStatusText}");
-                    col.Item().Text($"Remote Capability: {(s.IsRemote ? (RemoteCapabilityStatusCache ?? "Unknown") : "Local Full")}").FontSize(10); // PHASE 7
+                    col.Item().Text($"Version Fetch State: {s.LatestFetchState}{(string.IsNullOrWhiteSpace(s.LatestFetchError) ? "" : $" (Error: {Shorten(s.LatestFetchError, 60)})")}")
+                        .FontSize(9).FontColor(Colors.Grey.Darken2);
+                    col.Item().Text($"Remote Capability: {(s.IsRemote ? s.RemoteCapabilityStatus : "Local Full")}").FontSize(9);
                 });
-                r.ConstantItem(120).AlignRight().Text(DateTime.Now.ToString("G")).FontSize(10);
+                r.ConstantItem(140).AlignRight().Text(DateTime.Now.ToString("G")).FontSize(10);
             });
         }
 
-        private static void Body(IContainer c, Snapshot s)
+        private static void RenderBody(IContainer c, Snapshot s)
         {
             c.Column(col =>
             {
-                var sys = s.SystemInfo ?? new SystemInfo();
-                Section(col, "System Info", section =>
+                Section(col, "System Info", sec =>
                 {
-                    section.Item().Text($"IP: {sys.IPAddress ?? ""}");
-                    section.Item().Text($"Join Type: {sys.JoinType ?? ""}");
-                    if (s.IsRemote) section.Item().Text("Remote Collection: Windows integrated credentials").FontColor(Colors.Green.Darken2); // PHASE6
+                    sec.Item().Text($"IP: {s.SystemInfo?.IPAddress ?? ""}");
+                    sec.Item().Text($"Join Type: {s.SystemInfo?.JoinType ?? ""}");
+                    if (s.IsRemote)
+                        sec.Item().Text("Remote Collection: Windows integrated credentials").FontColor(Colors.Green.Darken2).FontSize(10);
                 });
 
-                Section(col, "Defender Status", section =>
+                Section(col, "Defender Status", sec =>
                 {
-                    var d = s.Defender ?? new DefenderStatus();
-                    section.Item().Text($"Real-Time Protection: {d.RealTimeProtection}");
-                    section.Item().Text($"Running Mode: {d.AMRunningMode}");
-                    section.Item().Text($"AV Sig Age: {d.AntivirusSignatureAge}");
-                    section.Item().Text($"AS Sig Age: {d.AntispywareSignatureAge}");
-                    section.Item().Text($"Device Control Enforcement: {d.DeviceControlDefaultEnforcement}");
-                    section.Item().Text($"Device Control State: {d.DeviceControlState}");
+                    var d = s.Defender;
+                    sec.Item().Text($"Product Version: {d.AMProductVersion}");
+                    sec.Item().Text($"Engine Version: {d.AMEngineVersion}");
+                    sec.Item().Text($"Real-Time Protection: {d.RealTimeProtection}");
+                    sec.Item().Text($"Running Mode: {d.AMRunningMode}");
+                    sec.Item().Text($"AV Sig Age: {d.AntivirusSignatureAge}");
+                    sec.Item().Text($"AS Sig Age: {d.AntispywareSignatureAge}");
+                    sec.Item().Text($"Device Control Enforcement: {d.DeviceControlDefaultEnforcementDisplay}");
+                    sec.Item().Text($"Device Control State: {d.DeviceControlState}");
+                    sec.Item().Text(s.TamperProtectionDisplay);
                     if (s.LatestVersions != null)
                     {
-                        section.Item().Text($"Latest Platform Version: {s.LatestVersions.PlatformVersion}");
-                        section.Item().Text($"Latest Engine Version: {s.LatestVersions.EngineVersion}");
-                        section.Item().Text($"Latest Intelligence Version: {s.LatestVersions.SecurityIntelligenceVersion}");
+                        sec.Item().Text($"Latest Platform: {s.LatestVersions.PlatformVersion} (UpToDate: {s.PlatformUpToDate})");
+                        sec.Item().Text($"Latest Engine: {s.LatestVersions.EngineVersion} (UpToDate: {s.EngineUpToDate})");
+                        sec.Item().Text($"Latest Intelligence: {s.LatestVersions.SecurityIntelligenceVersion}");
                     }
                 });
 
-                var dg = s.DeviceGuardStatus ?? new DeviceGuardStatus();
-                Section(col, "Device Guard / VBS", section =>
+                Section(col, "Device Guard / VBS", sec =>
                 {
-                    section.Item().Text(dg.CodeIntegrityPolicyDisplay ?? "");
-                    section.Item().Text(dg.VbsStatusDisplay ?? "");
-                    section.Item().Text("Configured Services: " + (dg.SecurityServicesConfiguredDisplay ?? ""));
-                    section.Item().Text("Running Services: " + (dg.SecurityServicesRunningDisplay ?? ""));
+                    var dg = s.DeviceGuardStatus;
+                    sec.Item().Text(dg.CodeIntegrityPolicyDisplay ?? "");
+                    sec.Item().Text(dg.VbsStatusDisplay ?? "");
+                    sec.Item().Text("Configured Services: " + (dg.SecurityServicesConfiguredDisplay ?? ""));
+                    sec.Item().Text("Running Services: " + (dg.SecurityServicesRunningDisplay ?? ""));
+                    sec.Item().Text("User-mode CI: " + (dg.UsermodeCodeIntegrityPolicyDisplay ?? ""));
+                    sec.Item().Text("Security Features Enabled: " + (dg.SecurityFeaturesEnabledDisplay ?? ""));
                 });
 
-                Section(col, "Intune / Entra Management", section =>
+                Section(col, "App Control Status", sec =>
                 {
-                    section.Item().Text("Last Sync UTC: " + (s.IntuneLastSyncUtc?.ToString("u") ?? "Unknown"));
+                    sec.Item().Text($"Kernel Mode CI: {s.AppControlStatus.KernelModeCodeIntegrity}");
+                    sec.Item().Text($"User Mode CI: {s.AppControlStatus.UserModeCodeIntegrity}");
                 });
 
-                if (!string.IsNullOrWhiteSpace(s.FirewallLoggingStatus))
+                Section(col, "Intune / Entra Enrollment", sec =>
                 {
-                    Section(col, "Firewall Logging Advisory", section =>
-                    {
-                        section.Item().Text(s.FirewallLoggingStatus).FontColor(Colors.Orange.Darken2);
-                    });
-                }
+                    sec.Item().Text("Last Sync UTC: " + (s.IntuneLastSyncUtc?.ToString("u") ?? "Unknown"));
+                    sec.Item().Text("Enrollment Type: " + s.IntuneEnrollmentStatus);
+                    sec.Item().Text("Enrollment State: " + s.IntuneEnrollmentState);
+                    sec.Item().Text("UPN: " + s.IntuneEnrollmentUpn);
+                });
+
+                Section(col, "Firewall Profiles", sec =>
+                {
+                    if (!string.IsNullOrWhiteSpace(s.FirewallProfilesMultiline))
+                        sec.Item().Text(s.FirewallProfilesMultiline).FontSize(9).FontFamily("Consolas");
+                    else
+                        sec.Item().Text("No firewall profile data.");
+                    if (!string.IsNullOrWhiteSpace(s.FirewallLoggingStatus))
+                        sec.Item().Text("Logging Advisory: " + s.FirewallLoggingStatus).FontColor(Colors.Orange.Darken2);
+                });
+
+                Section(col, "Device Control Policy Summary", sec =>
+                {
+                    sec.Item().Text($"Status: {s.DeviceControlPolicyStatus}");
+                    sec.Item().Text($"Groups: {s.DeviceControlPolicyGroupsCount} | Rules: {s.DeviceControlPolicyRulesCount}");
+                });
 
                 if (s.WfpFilterCount.HasValue)
                 {
-                    var count = s.WfpFilterCount.Value;
-                    var noteColor = Colors.Black;
-                    string text = $"Total WFP Filters: {count:N0}";
-                    if (count >= 50000)
+                    Section(col, "WFP Filters", sec =>
                     {
-                        text += " (HIGH - consider pruning / investigating policy layering)";
-                        noteColor = Colors.Red.Darken2;
-                    }
-                    else if (count >= 10000)
-                    {
-                        text += " (Large)";
-                        noteColor = Colors.Orange.Darken2;
-                    }
-
-                    Section(col, "WFP Filters", section =>
-                    {
-                        section.Item().Text(text).FontColor(noteColor).SemiBold();
-                        if (s.WfpRuleCounts != null && s.WfpRuleCounts.Count > 0)
+                        var count = s.WfpFilterCount.Value;
+                        var text = $"Total Filters: {count:N0}";
+                        var color = Colors.Black;
+                        if (count >= 50000) { text += " (HIGH)"; color = Colors.Red.Darken2; }
+                        else if (count >= 10000) { text += " (Large)"; color = Colors.Orange.Darken2; }
+                        sec.Item().Text(text).SemiBold().FontColor(color);
+                        if (!string.IsNullOrWhiteSpace(s.WfpRemoteStatusNote))
+                            sec.Item().Text("Remote Note: " + s.WfpRemoteStatusNote).FontSize(9).FontColor(Colors.Grey.Darken2);
+                        if (!string.IsNullOrWhiteSpace(s.WfpModeDiagnostics))
+                            sec.Item().Text("Mode Diagnostics: " + s.WfpModeDiagnostics).FontSize(9);
+                        if (s.WfpRuleCounts.Any())
                         {
-                            var top = s.WfpRuleCounts.Take(15).ToList();
-                            section.Item().PaddingTop(4).Text("Top Rule Names (by occurrence):").Italic().FontSize(10);
-                            section.Item().Table(t =>
+                            var top = s.WfpRuleCounts.Take(20).ToList();
+                            sec.Item().Text("Top Rule Names:").Italic().FontSize(10);
+                            sec.Item().Table(t =>
                             {
                                 t.ColumnsDefinition(cd =>
                                 {
@@ -177,7 +209,7 @@ namespace MDE_Monitoring_App.Services
                                 });
                                 foreach (var rc in top)
                                 {
-                                    t.Cell().Padding(2).Text(Shorten(rc.Name, 70)).FontSize(8);
+                                    t.Cell().Padding(2).Text(Shorten(rc.Name, 80)).FontSize(8);
                                     t.Cell().Padding(2).AlignRight().Text(rc.Count.ToString("N0")).FontSize(8);
                                 }
                             });
@@ -186,133 +218,123 @@ namespace MDE_Monitoring_App.Services
                 }
                 else
                 {
-                    Section(col, "WFP Filters", section =>
+                    Section(col, "WFP Filters", sec =>
                     {
-                        section.Item().Text(s.WfpDiagnostics ?? "WFP data not collected").FontColor(Colors.Grey.Darken2); // PHASE6
+                        sec.Item().Text(s.WfpDiagnostics ?? "No WFP data").FontColor(Colors.Grey.Darken2);
+                        if (!string.IsNullOrWhiteSpace(s.WfpRemoteStatusNote))
+                            sec.Item().Text("Remote Note: " + s.WfpRemoteStatusNote).FontSize(9).FontColor(Colors.Grey.Darken2);
                     });
                 }
 
-                // PHASE6: Remote disclaimers
-                Section(col, "Collection Notes", section =>
+                Section(col, "Collection Notes", sec =>
                 {
-                    section.Item().Text(s.IsRemote
-                        ? "Remote collection may omit WFP detailed enumeration and some real-time states due to protocol limitations."
-                        : "Local collection provides full detail set.").FontSize(9).FontColor(Colors.Grey.Darken2);
+                    sec.Item().Text(s.IsRemote
+                        ? "Remote collection may omit certain detailed WFP and live Defender runtime attributes due to protocol limitations."
+                        : "Local collection includes full detail set.")
+                        .FontSize(9).FontColor(Colors.Grey.Darken2);
                 });
 
                 TableSection(col, "Firewall Drops", s.FirewallEvents,
                     new[] { "Time", "Proto", "Src", "Dst", "SPort", "DPort", "Info" },
                     e => new[]
                     {
-                        e?.Timestamp.ToString("HH:mm:ss") ?? "",
-                        e?.Protocol ?? "",
-                        e?.SourceIp ?? "",
-                        e?.DestinationIp ?? "",
-                        e?.SourcePort?.ToString() ?? "",
-                        e?.DestinationPort?.ToString() ?? "",
-                        e?.Info ?? ""
+                        e.Timestamp.ToString("yyyy-MM-dd HH:mm:ss"),
+                        e.Protocol,
+                        e.SourceIp,
+                        e.DestinationIp,
+                        e.SourcePort?.ToString() ?? "",
+                        e.DestinationPort?.ToString() ?? "",
+                        e.Info
                     });
 
                 TableSection(col, "Device Control Events", s.DeviceControlEvents,
                     new[] { "Time", "InstancePathId", "VID", "PID", "Denied", "Granted" },
                     e => new[]
                     {
-                        e?.Timestamp.ToString("yyyy-MM-dd HH:mm:ss") ?? "",
-                        e?.InstancePathId ?? "",
-                        e?.VID ?? "",
-                        e?.PID ?? "",
-                        e?.DeniedAccess ?? "",
-                        e?.GrantedAccess ?? ""
+                        e.Timestamp.ToString("yyyy-MM-dd HH:mm:ss"),
+                        e.InstancePathId ?? "",
+                        e.VID ?? "",
+                        e.PID ?? "",
+                        e.DeniedAccess ?? "",
+                        e.GrantedAccess ?? ""
                     });
 
                 TableSection(col, "App Control Events", s.AppControlEvents,
                     new[] { "Time", "ID", "Level", "Channel", "Message" },
                     e => new[]
                     {
-                        e?.Time.ToString("HH:mm:ss") ?? "",
-                        e?.Id.ToString() ?? "",
-                        e?.Level ?? "",
-                        Shorten(e?.Channel, 25),
-                        Shorten(e?.Message, 80)
+                        e.Time.ToString("yyyy-MM-dd HH:mm:ss"),
+                        e.Id.ToString(),
+                        e.Level,
+                        e.Channel,
+                        e.Message
                     });
 
                 TableSection(col, "Policies", s.Policies,
                     new[] { "Name", "Interpreted", "Raw", "Severity" },
-                    p => (string[])(new[]
+                    p => new[]
                     {
-                        p?.DisplayName ?? "",
-                        p?.InterpretedValue ?? "",
-                        p?.RawValue ?? "",
-                        p?.Severity ?? ""
-                    }));
+        p.DisplayName,
+        p.InterpretedValue,
+        p.RawValue?.ToString(),
+        p.Severity
+                    });
 
-                TableSection(col, "Logs", s.Logs,
+                TableSection(col, "Defender Logs", s.Logs,
                     new[] { "Time", "Level", "Message" },
                     l => new[]
                     {
-                        l?.Time.ToString("HH:mm:ss") ?? "",
-                        l?.Level ?? "",
-                        Shorten(l?.Message, 120)
+                        l.Time.ToString("yyyy-MM-dd HH:mm:ss"),
+                        l.Level,
+                        l.Message
                     });
-
             });
         }
 
         private static void Section(ColumnDescriptor col, string title, Action<ColumnDescriptor> content)
         {
-            if (col == null) return;
             col.Item().PaddingBottom(6).Column(cc =>
             {
-                cc.Item().Text(title ?? "").FontSize(14).Bold().FontColor(Colors.Blue.Darken2);
+                cc.Item().Text(title).FontSize(14).Bold().FontColor(Colors.Blue.Darken2);
                 cc.Item().PaddingLeft(6).Column(content);
             });
         }
 
         private static void TableSection<T>(ColumnDescriptor col, string title, IList<T>? rows, string[] headers, Func<T, string[]> selector)
         {
-            if (col == null || headers == null || selector == null) return;
             if (rows == null || rows.Count == 0) return;
-
             col.Item().PaddingBottom(8).Element(e =>
             {
                 e.Column(cc =>
                 {
-                    cc.Item().Text(title ?? "").FontSize(14).Bold().FontColor(Colors.Blue.Darken2);
+                    cc.Item().Text(title).FontSize(14).Bold().FontColor(Colors.Blue.Darken2);
                     cc.Item().Table(table =>
                     {
-                        var hcount = headers.Length;
-                        table.ColumnsDefinition(columns =>
+                        table.ColumnsDefinition(def =>
                         {
-                            columns.RelativeColumn();
-                            for (int i = 0; i < hcount; i++)
-                                columns.RelativeColumn();
+                            def.ConstantColumn(22);
+                            foreach (var _ in headers) def.RelativeColumn();
                         });
 
                         table.Header(h =>
                         {
                             h.Cell().Background(Colors.Grey.Lighten2).Padding(2).Text("#").SemiBold().FontSize(9);
-                            for (int i = 0; i < headers.Length; i++)
-                                h.Cell().Background(Colors.Grey.Lighten2).Padding(2).Text(headers[i] ?? "").SemiBold().FontSize(9);
+                            foreach (var hdr in headers)
+                                h.Cell().Background(Colors.Grey.Lighten2).Padding(2).Text(hdr).SemiBold().FontSize(9);
                         });
 
-                        int idx = 1;
-                        foreach (var row in rows.Where(r => r != null))
+                        int i = 1;
+                        foreach (var row in rows)
                         {
                             string[] cols;
-                            try
-                            {
-                                cols = selector(row) ?? Array.Empty<string>();
-                            }
-                            catch
-                            {
-                                continue;
-                            }
+                            try { cols = selector(row) ?? Array.Empty<string>(); }
+                            catch { continue; }
 
-                            table.Cell().Padding(2).Text(idx++.ToString()).FontSize(8);
-                            for (int i = 0; i < headers.Length; i++)
+                            table.Cell().Padding(2).Text(i++.ToString()).FontSize(8);
+                            for (int c = 0; c < headers.Length; c++)
                             {
-                                var cellText = i < cols.Length ? Shorten(cols[i], 90) : "";
-                                table.Cell().Padding(2).Text(cellText ?? "").FontSize(8);
+                                var cellText = c < cols.Length ? Shorten(cols[c], 95) : "";
+                                table.Cell().Padding(2).Text(cellText).FontSize(8);
                             }
                         }
                     });
@@ -320,11 +342,8 @@ namespace MDE_Monitoring_App.Services
             });
         }
 
-        private static string Shorten(string? value, int max)
-        {
-            if (string.IsNullOrEmpty(value)) return "";
-            return value.Length <= max ? value : value.Substring(0, max - 1) + "…";
-        }
+        private static string Shorten(string? value, int max) =>
+            string.IsNullOrEmpty(value) ? "" : (value.Length <= max ? value : value.Substring(0, max - 1) + "…");
 
         private class Snapshot
         {
@@ -333,20 +352,36 @@ namespace MDE_Monitoring_App.Services
             public LatestDefenderVersions? LatestVersions { get; set; }
             public string PlatformStatusText { get; set; } = "";
             public string EngineStatusText { get; set; } = "";
+            public bool PlatformUpToDate { get; set; }
+            public bool EngineUpToDate { get; set; }
+            public LatestFetchState LatestFetchState { get; set; }
+            public string LatestFetchError { get; set; } = "";
             public List<FirewallLogEntry> FirewallEvents { get; set; } = new();
             public List<DeviceControlEvent> DeviceControlEvents { get; set; } = new();
             public List<PolicySetting> Policies { get; set; } = new();
             public List<LogEntry> Logs { get; set; } = new();
             public List<AppControlEvent> AppControlEvents { get; set; } = new();
+            public AppControlStatus AppControlStatus { get; set; } = new();
             public DeviceGuardStatus DeviceGuardStatus { get; set; } = new();
             public SystemInfo SystemInfo { get; set; } = new();
             public DateTime? IntuneLastSyncUtc { get; set; }
+            public string IntuneEnrollmentStatus { get; set; } = "";
+            public string IntuneEnrollmentUpn { get; set; } = "";
+            public string IntuneEnrollmentState { get; set; } = "";
             public string FirewallLoggingStatus { get; set; } = "";
+            public string FirewallProfilesMultiline { get; set; } = "";
+            public string DeviceControlPolicyStatus { get; set; } = "";
+            public int DeviceControlPolicyGroupsCount { get; set; }
+            public int DeviceControlPolicyRulesCount { get; set; }
             public int? WfpFilterCount { get; set; }
             public List<WfpRuleNameCount> WfpRuleCounts { get; set; } = new();
+            public string WfpModeDiagnostics { get; set; } = "";
+            public string WfpRemoteStatusNote { get; set; } = "";
             public bool IsRemote { get; set; }
             public string? TargetMachine { get; set; }
+            public string RemoteCapabilityStatus { get; set; } = "";
             public string? WfpDiagnostics { get; set; }
+            public string TamperProtectionDisplay { get; set; } = "";
         }
 
         public static string? RemoteCapabilityStatusCache { get; private set; }

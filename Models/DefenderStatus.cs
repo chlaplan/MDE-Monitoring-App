@@ -15,6 +15,7 @@ namespace MDE_Monitoring_App.Models
         private string _antispywareSignatureAge = string.Empty;
         private string _deviceControlDefaultEnforcement = string.Empty;
         private string _deviceControlState = string.Empty;
+        private bool? _isTamperProtected = null;
 
         public string AMProductVersion { get => _amProductVersion; set => Set(ref _amProductVersion, value); }
         public string AMEngineVersion { get => _amEngineVersion; set => Set(ref _amEngineVersion, value); }
@@ -25,14 +26,30 @@ namespace MDE_Monitoring_App.Models
         public string DeviceControlDefaultEnforcement { get => _deviceControlDefaultEnforcement; set => Set(ref _deviceControlDefaultEnforcement, value); }
         public string DeviceControlState { get => _deviceControlState; set => Set(ref _deviceControlState, value); }
 
-        public event PropertyChangedEventHandler PropertyChanged;
+        public bool? IsTamperProtected { get => _isTamperProtected; set => Set(ref _isTamperProtected, value); }
+        public string TamperProtectionDisplay =>
+            IsTamperProtected switch
+            {
+                true => "Tamper Protection: Enabled",
+                false => "Tamper Protection: Disabled",
+                _ => "Tamper Protection: Unknown"
+            };
+
+        public string DeviceControlDefaultEnforcementDisplay =>
+            string.IsNullOrWhiteSpace(DeviceControlDefaultEnforcement)
+                ? "Disabled (Device control disabled)"
+                : DeviceControlDefaultEnforcement;
+
+        public event PropertyChangedEventHandler? PropertyChanged;
         private void Set<T>(ref T field, T value, [CallerMemberName] string? prop = null)
         {
-            if (!Equals(field, value))
-            {
-                field = value;
-                PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(prop));
-            }
+            if (Equals(field, value)) return;
+            field = value;
+            PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(prop));
+            if (prop == nameof(DeviceControlDefaultEnforcement))
+                PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(nameof(DeviceControlDefaultEnforcementDisplay)));
+            if (prop == nameof(IsTamperProtected))
+                PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(nameof(TamperProtectionDisplay)));
         }
     }
 }

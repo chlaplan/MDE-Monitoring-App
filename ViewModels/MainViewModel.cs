@@ -29,6 +29,7 @@ namespace MDE_Monitoring_App
         private readonly DeviceControlPolicyService _deviceControlPolicyService = new();
         private readonly FirewallStatusService _firewallStatusService = new();
         private readonly RemoteSystemInfoService _remoteSystemInfoService = new();
+        private readonly IntuneEnrollmentService _intuneEnrollmentService = new();
 
 
         public ObservableCollection<LogEntry> Logs { get; } = new();
@@ -336,6 +337,12 @@ namespace MDE_Monitoring_App
                 OnPropertyChanged(nameof(VbsStatusDisplay));
                 OnPropertyChanged(nameof(SecurityServicesConfiguredDisplay));
                 OnPropertyChanged(nameof(SecurityServicesRunningDisplay));
+                OnPropertyChanged(nameof(AvailableSecurityPropertiesDisplay));
+                OnPropertyChanged(nameof(RequiredSecurityPropertiesDisplay));
+                OnPropertyChanged(nameof(SecurityFeaturesEnabledDisplay));
+                OnPropertyChanged(nameof(UsermodeCodeIntegrityPolicyDisplay));
+                OnPropertyChanged(nameof(InstanceIdentifierDisplay));
+                OnPropertyChanged(nameof(VersionDisplay));
             }
         }
 
@@ -343,6 +350,12 @@ namespace MDE_Monitoring_App
         public string VbsStatusDisplay => "VBS Status: " + DeviceGuardStatus.VbsStatusDisplay;
         public string SecurityServicesConfiguredDisplay => "Configured Services: " + DeviceGuardStatus.SecurityServicesConfiguredDisplay;
         public string SecurityServicesRunningDisplay => "Running Services: " + DeviceGuardStatus.SecurityServicesRunningDisplay;
+        public string AvailableSecurityPropertiesDisplay => "Available: " + DeviceGuardStatus.AvailableSecurityPropertiesDisplay;
+        public string RequiredSecurityPropertiesDisplay  => "Required: " + DeviceGuardStatus.RequiredSecurityPropertiesDisplay;
+        public string SecurityFeaturesEnabledDisplay     => "Features Enabled: " + DeviceGuardStatus.SecurityFeaturesEnabledDisplay;
+        public string UsermodeCodeIntegrityPolicyDisplay => "User-mode CI: " + DeviceGuardStatus.UsermodeCodeIntegrityPolicyDisplay;
+        public string InstanceIdentifierDisplay          => "Instance ID: " + DeviceGuardStatus.InstanceIdentifierDisplay;
+        public string VersionDisplay                     => "Schema Version: " + DeviceGuardStatus.VersionDisplay;
 
         private async Task<DeviceGuardStatus> LoadDeviceGuardStatusAsync()
         {
@@ -417,7 +430,6 @@ namespace MDE_Monitoring_App
             }
         }
 
-        // (Keep original single-line property if other bindings rely on it)
         public string FirewallProfilesDisplay
         {
             get
@@ -427,13 +439,11 @@ namespace MDE_Monitoring_App
             }
         }
 
-        // NEW: Multiline, aligned formatting (monospace friendly)
         public string FirewallProfilesMultilineDisplay
         {
             get
             {
                 if (FirewallProfileStatusesDisplay.Count == 0) return "Firewall: Unknown";
-                // Order for consistent display: Domain, Private, Public
                 var order = new[] { "Domain", "Private", "Public" };
                 var profiles = FirewallProfileStatusesDisplay
                     .OrderBy(p => Array.IndexOf(order, p.Profile) switch { -1 => 999, var idx => idx })
@@ -443,11 +453,9 @@ namespace MDE_Monitoring_App
                 sb.Append("Firewall Profiles:");
                 foreach (var p in profiles)
                 {
-                    // Example line:
-                    //   Domain  : On  In:Block  Out:Allow
                     sb.AppendLine();
                     sb.Append("  ")
-                      .Append(p.Profile.PadRight(7)) // width for alignment (Domain=6, Private=7, Public=6)
+                      .Append(p.Profile.PadRight(7))
                       .Append(" : ")
                       .Append(p.Enabled ? "On " : "Off")
                       .Append("  In:")
@@ -512,6 +520,7 @@ namespace MDE_Monitoring_App
             }
         }
 
+
         public async Task RefreshDataAsync()
         {
             if (IsBusy) return;
@@ -525,7 +534,6 @@ namespace MDE_Monitoring_App
                 var logsTask            = Task.Run(() => _logCollector.GetDefenderLogs(IsRemote ? TargetMachine : null, remoteOpts, refreshCts.Token), refreshCts.Token);
                 var statusTask          = Task.Run(() => _defenderStatusService.GetStatus(IsRemote ? TargetMachine : null, remoteOpts?.LongTimeout ?? TimeSpan.FromSeconds(5)), refreshCts.Token);
                 var firewallTask        = Task.Run(() => _firewallLogService.LoadRecentDrops(200, IsRemote ? TargetMachine : null, refreshCts.Token), refreshCts.Token);
-                // UPDATED: use safe remote-capable WFP enumeration
                 _wfpFilterService.UsePsExecFallback = UsePsExec;
                 _wfpFilterService.PsExecCustomPath = string.IsNullOrWhiteSpace(PsExecPath) ? null : PsExecPath;
                 var wfpTask             = _wfpFilterService.GetFilterSummarySafeAsync(
@@ -540,7 +548,12 @@ namespace MDE_Monitoring_App
                 var intuneSyncTask      = Task.Run(_intuneSyncService.GetLastSync, refreshCts.Token);
                 var appControlStatusTask= Task.Run(_appControlStatusService.GetStatus, refreshCts.Token);
                 var appControlLogsTask  = Task.Run(() => _appControlLogService.GetRecent(IsRemote ? TargetMachine : null, 150, refreshCts.Token, remoteOpts?.ShortTimeout ?? TimeSpan.FromSeconds(8), remoteOpts), refreshCts.Token);
-                var deviceGuardTask     = Task.Run(_deviceGuardStatusService.GetStatus, refreshCts.Token);
+                _deviceGuardStatusService.UsePsExecFallback = UsePsExec;
+                _deviceGuardStatusService.PsExecCustomPath = string.IsNullOrWhiteSpace(PsExecPath) ? null : PsExecPath;
+                var dgTask = _deviceGuardStatusService.GetStatusAsync(
+                    IsRemote ? TargetMachine : null,
+                    TimeSpan.FromSeconds(20),
+                    refreshCts.Token);
                 DeviceControlPolicyStatus = "Loading...";
                 var dcPoliciesTask      = _deviceControlPolicyService.GetSnapshotAsync(
                     fallbackGroupsFile: "SamplePolicies/PolicyGroups.txt",
@@ -548,6 +561,7 @@ namespace MDE_Monitoring_App
                     ct: refreshCts.Token,
                     targetMachine: IsRemote ? TargetMachine : null);
                 var fwStatusTask = Task.Run(() => _firewallStatusService.GetStatus(IsRemote ? TargetMachine : null, TimeSpan.FromSeconds(12), refreshCts.Token), refreshCts.Token);
+                var enrollmentTask = Task.Run(() => _intuneEnrollmentService.Get(IsRemote ? TargetMachine : null), refreshCts.Token);
 
                 // Await
                 var dcEvents         = await dcTask.ConfigureAwait(false);
@@ -560,9 +574,10 @@ namespace MDE_Monitoring_App
                 var intuneLastSync   = await intuneSyncTask.ConfigureAwait(false);
                 var appControlStatus = await appControlStatusTask.ConfigureAwait(false);
                 var appControlLogs   = await appControlLogsTask.ConfigureAwait(false);
-                var deviceGuardStatus= await deviceGuardTask.ConfigureAwait(false);
+                var deviceGuardStatus = await dgTask.ConfigureAwait(false);
                 var dcPoliciesSnapshot = await dcPoliciesTask.ConfigureAwait(false);
                 var fwProfiles       = await fwStatusTask.ConfigureAwait(false);
+                var enrollmentInfo   = await enrollmentTask.ConfigureAwait(false);
 
                 if (IsRemote)
                 {
@@ -608,6 +623,7 @@ namespace MDE_Monitoring_App
                     DefenderStatus.AntispywareSignatureAge        = newStatus.AntispywareSignatureAge;
                     DefenderStatus.DeviceControlDefaultEnforcement= newStatus.DeviceControlDefaultEnforcement;
                     DefenderStatus.DeviceControlState             = newStatus.DeviceControlState;
+                    DefenderStatus.IsTamperProtected              = newStatus.IsTamperProtected;
 
                     if (IsRemote)
                     {
@@ -639,6 +655,14 @@ namespace MDE_Monitoring_App
                     LatestFetchState = latest.state;
                     LatestFetchError = latest.error;
                     IntuneLastSyncUtc= intuneLastSync;
+                    _intuneEnrollmentInfo = enrollmentInfo;
+                    OnPropertyChanged(nameof(IntuneEnrollmentStatus));
+                    OnPropertyChanged(nameof(IntuneEnrollmentEffectiveType));
+                    OnPropertyChanged(nameof(IntuneEnrollmentOrigin));
+                    OnPropertyChanged(nameof(IntuneEnrollmentUpn));
+                    OnPropertyChanged(nameof(IntuneEnrollmentState));
+                    OnPropertyChanged(nameof(IsIntuneCoManaged));
+                    OnPropertyChanged(nameof(IntuneEnrollmentDisplay));
 
                     AppControlStatus = appControlStatus;
 
@@ -915,5 +939,17 @@ namespace MDE_Monitoring_App
             System.Security.SecureString? Password,
             TimeSpan ShortTimeout,
             TimeSpan LongTimeout);
+
+        private IntuneEnrollmentInfo _intuneEnrollmentInfo = new();
+        public string IntuneEnrollmentStatus => _intuneEnrollmentInfo.Type;
+        public string IntuneEnrollmentEffectiveType => _intuneEnrollmentInfo.EffectiveType;
+        public string IntuneEnrollmentOrigin => _intuneEnrollmentInfo.EnrollmentOrigin;
+        public string IntuneEnrollmentUpn => _intuneEnrollmentInfo.UPN;
+        public string IntuneEnrollmentState => _intuneEnrollmentInfo.EnrollmentStateDisplay;
+        public bool IsIntuneCoManaged => _intuneEnrollmentInfo.IsCoManaged;
+
+        // Updated combined display to use derived values
+        public string IntuneEnrollmentDisplay =>
+            $"{IntuneEnrollmentEffectiveType} | {IntuneEnrollmentOrigin} | UPN: {IntuneEnrollmentUpn} | State: {IntuneEnrollmentState}";
     }
 }
