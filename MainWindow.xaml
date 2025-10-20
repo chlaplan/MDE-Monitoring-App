@@ -8,9 +8,12 @@
         Background="#F3F3F3"
         FontFamily="Segoe UI"
         FontSize="14">
+    
     <Window.Resources>
         <conv:DescriptorsJoinConverter x:Key="DescriptorsJoinConverter" Separator="; " />
         <conv:AccessMaskConverter x:Key="AccessMaskConverter" />
+        <BooleanToVisibilityConverter x:Key="BoolToVisibilityConverter"/>
+        <conv:BooleanInverseConverter x:Key="BooleanInverseConverter"/>
     </Window.Resources>
     <Grid Margin="10">
         <Grid.RowDefinitions>
@@ -18,11 +21,124 @@
             <RowDefinition Height="*"/>
         </Grid.RowDefinitions>
 
-        <TextBlock Text="Microsoft Defender for Endpoint Monitor"
+        <!-- <TextBlock Text="Microsoft Defender for Endpoint Monitor"
                    FontSize="22" FontWeight="Bold"
                    Foreground="#0078D4"
-                   Margin="0,0,0,10"/>
+                   Margin="0,0,0,10"/> -->
 
+        <!-- REPLACE ONLY the existing top Grid (the one with title + target controls) with this version -->
+        <Grid Grid.Row="0" Margin="0,0,0,14">
+            <Grid.RowDefinitions>
+                <RowDefinition Height="Auto"/>
+                <RowDefinition Height="Auto"/>
+            </Grid.RowDefinitions>
+
+            <!-- Title row -->
+            <TextBlock Grid.Row="0"
+                       Text="Microsoft Defender for Endpoint Monitor"
+                       FontSize="22"
+                       FontWeight="Bold"
+                       Foreground="#0078D4"
+                       Margin="0,0,0,4"/>
+
+            <!-- Target + Controls row -->
+            <Grid Grid.Row="1">
+                <Grid.ColumnDefinitions>
+                    <ColumnDefinition Width="Auto"/>   <!-- Target label -->
+                    <ColumnDefinition Width="220"/>    <!-- Target textbox -->
+                    <ColumnDefinition Width="Auto"/>   <!-- PsExec checkbox -->
+                    <ColumnDefinition Width="250"/>    <!-- PsExec path textbox -->
+                    <ColumnDefinition Width="Auto"/>   <!-- Connect + spinner -->
+                    <ColumnDefinition Width="*"/>      <!-- Status text -->
+                </Grid.ColumnDefinitions>
+
+                <!-- Target label -->
+                <TextBlock Grid.Column="0"
+                           Text="Target:"
+                           VerticalAlignment="Center"
+                           FontWeight="SemiBold"
+                           Foreground="#0078D4"
+                           Margin="0,0,8,0"/>
+
+                <!-- Target textbox -->
+                <TextBox Grid.Column="1"
+                         Text="{Binding TargetMachine, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}"
+                         VerticalAlignment="Center"
+                         ToolTip="Enter hostname or IP. Use 'localhost' for local machine."
+                         Padding="4,2"
+                         MaxLength="300"
+                         Width="200"
+                         TextWrapping="NoWrap"/>
+
+                <!-- Use PsExec checkbox -->
+                <CheckBox Grid.Column="2"
+                          Content="Use PsExec"
+                          IsChecked="{Binding UsePsExec, Mode=TwoWay}"
+                          VerticalAlignment="Center"
+                          Margin="12,0,0,0"
+                          ToolTip="Use PsExec for remote WFP enumeration (unchecked = WinRM Invoke-Command)"/>
+
+                <!-- PsExec path textbox -->
+                <TextBox Grid.Column="3"
+                         Text="{Binding PsExecPath, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}"
+                         VerticalAlignment="Center"
+                         Margin="12,0,0,0"
+                         Padding="4,2"
+                         ToolTip="Path to PsExec.exe (e.g. C:\Sysinternals\PsExec.exe). Must exist if Use PsExec is checked."/>
+
+                <!-- Connect button + spinner (single instance) -->
+                <StackPanel Grid.Column="4"
+                            Orientation="Horizontal"
+                            VerticalAlignment="Center"
+                            Margin="16,0,0,0">
+                    <Button Content="Connect / Refresh"
+                            Padding="10,4"
+                            Click="RefreshButton_Click"
+                            Background="#0078D4"
+                            Foreground="White"
+                            IsEnabled="{Binding IsBusy, Converter={StaticResource BooleanInverseConverter}, FallbackValue=True}"
+                            ToolTip="Fetch data from the specified machine"/>
+                    <!-- Busy spinner -->
+                    <Grid Width="28" Height="28" Margin="10,0,0,0"
+                          Visibility="{Binding IsBusy, Converter={StaticResource BoolToVisibilityConverter}}">
+                        <Canvas Width="28" Height="28">
+                            <!-- 8 dots circle (radius ~10, center 14,14) -->
+                            <Ellipse Width="5" Height="5" Fill="#0078D4" Canvas.Left="22" Canvas.Top="13" Opacity="1"/>
+                            <Ellipse Width="5" Height="5" Fill="#0078D4" Canvas.Left="21" Canvas.Top="19" Opacity="0.85"/>
+                            <Ellipse Width="5" Height="5" Fill="#0078D4" Canvas.Left="14" Canvas.Top="22" Opacity="0.7"/>
+                            <Ellipse Width="5" Height="5" Fill="#0078D4" Canvas.Left="7"  Canvas.Top="19" Opacity="0.55"/>
+                            <Ellipse Width="5" Height="5" Fill="#0078D4" Canvas.Left="6"  Canvas.Top="13" Opacity="0.4"/>
+                            <Ellipse Width="5" Height="5" Fill="#0078D4" Canvas.Left="7"  Canvas.Top="7"  Opacity="0.55"/>
+                            <Ellipse Width="5" Height="5" Fill="#0078D4" Canvas.Left="14" Canvas.Top="4"  Opacity="0.7"/>
+                            <Ellipse Width="5" Height="5" Fill="#0078D4" Canvas.Left="21" Canvas.Top="7"  Opacity="0.85"/>
+                            <Canvas.RenderTransform>
+                                <RotateTransform Angle="0" CenterX="14" CenterY="14"/>
+                            </Canvas.RenderTransform>
+                            <Canvas.Triggers>
+                                <EventTrigger RoutedEvent="Canvas.Loaded">
+                                    <BeginStoryboard>
+                                        <Storyboard RepeatBehavior="Forever">
+                                            <DoubleAnimation Storyboard.TargetProperty="(UIElement.RenderTransform).(RotateTransform.Angle)"
+                                                             From="0" To="360" Duration="0:0:1.0"/>
+                                        </Storyboard>
+                                    </BeginStoryboard>
+                                </EventTrigger>
+                            </Canvas.Triggers>
+                        </Canvas>
+                    </Grid>
+                </StackPanel>
+
+                <!-- Status text -->
+                <TextBlock Grid.Column="5"
+                           Margin="18,0,0,0"
+                           VerticalAlignment="Center"
+                           Foreground="Gray"
+                           TextTrimming="CharacterEllipsis"
+                           TextWrapping="NoWrap"
+                           ToolTip="{Binding TargetMachineStatus}"
+                           Text="{Binding TargetMachineStatus}"/>
+            </Grid>
+        </Grid>
         <TabControl Grid.Row="1">
 
             <!-- Overview Tab -->
@@ -33,8 +149,8 @@
                         <Button Content="Refresh" Click="RefreshButton_Click" Margin="20,0,0,0" 
                                 Background="#0078D4" Foreground="White" Padding="6,2"/>
                         <TextBlock Margin="20,0,0,0" VerticalAlignment="Center">
-                            <Run Text="Last Refreshed: "/>
-                            <Run Text="{Binding LastRefreshed, Mode=OneWay, StringFormat='Last refreshed: {0:G}'}"/>
+                            <!-- "<Run Text="Last Refreshed: "/> -->
+                            <Run Text="{Binding LastRefreshed, Mode=OneWay, StringFormat='Last Refreshed: {0:G}'}"/>
                         </TextBlock>
                         <Button Content="Export PDF" Click="ExportPdf_Click" Margin="10,0,0,0"
                                 Background="#004578" Foreground="White" Padding="6,2"/>
@@ -114,6 +230,11 @@
                                 <TextBlock Text="{Binding VbsStatusDisplay}" Margin="0,2,0,0"/>
                                 <TextBlock Text="{Binding SecurityServicesConfiguredDisplay}" Margin="0,2,0,0"/>
                                 <TextBlock Text="{Binding SecurityServicesRunningDisplay}" Margin="0,2,0,0"/>
+                                <TextBlock Text="{Binding FirewallProfilesMultilineDisplay}"
+           Margin="0,2,0,0"
+           FontFamily="Consolas"
+           TextWrapping="Wrap"
+           xml:space="preserve"/>
                             </StackPanel>
                         </Border>
 
@@ -499,16 +620,19 @@
                         </TextBlock>
                     </StackPanel>
 
-                    <DataGrid Grid.Row="1"
-                  ItemsSource="{Binding AppControlEvents}"
-                  AutoGenerateColumns="False"
-                  IsReadOnly="True"
-                  AlternatingRowBackground="#E6F0FA"
-                  RowBackground="White"
-                  FontSize="13"
-                  RowHeight="26"
-                  ScrollViewer.VerticalScrollBarVisibility="Auto"
-                  ScrollViewer.HorizontalScrollBarVisibility="Auto">
+                    <DataGrid x:Name="AppControlDataGrid"
+          Grid.Row="1"
+          ItemsSource="{Binding AppControlEvents}"
+          AutoGenerateColumns="False"
+          IsReadOnly="True"
+          AlternatingRowBackground="#E6F0FA"
+          RowBackground="White"
+          FontSize="13"
+          RowHeight="26"
+          ScrollViewer.VerticalScrollBarVisibility="Auto"
+          ScrollViewer.HorizontalScrollBarVisibility="Auto"
+          RowDetailsVisibilityMode="Collapsed"
+          PreviewMouseLeftButtonDown="AppControlDataGrid_PreviewMouseLeftButtonDown">
                         <DataGrid.Columns>
                             <DataGridTextColumn Header="Time" Binding="{Binding Time, StringFormat={}{0:yyyy-MM-dd HH:mm:ss}}" Width="170"/>
                             <DataGridTextColumn Header="ID" Binding="{Binding Id}" Width="70"/>
@@ -517,12 +641,44 @@
                             <DataGridTextColumn Header="Message" Binding="{Binding Message}" Width="*">
                                 <DataGridTextColumn.ElementStyle>
                                     <Style TargetType="TextBlock">
-                                        <Setter Property="TextWrapping" Value="Wrap"/>
+                                        <Setter Property="TextWrapping" Value="NoWrap"/>
+                                        <Setter Property="TextTrimming" Value="CharacterEllipsis"/>
                                         <Setter Property="ToolTip" Value="{Binding Message}"/>
                                     </Style>
                                 </DataGridTextColumn.ElementStyle>
                             </DataGridTextColumn>
                         </DataGrid.Columns>
+
+                        <DataGrid.RowDetailsTemplate>
+                            <DataTemplate>
+                                <Border Margin="4"
+                    Padding="6"
+                    Background="#FAFCFE"
+                    BorderBrush="#D0DDE8"
+                    BorderThickness="1"
+                    CornerRadius="4">
+                                    <StackPanel>
+                                        <TextBlock Text="{Binding Time, StringFormat=Time: {0:yyyy-MM-dd HH:mm:ss}}"
+                               FontWeight="Bold" Margin="0,0,0,2"/>
+                                        <TextBlock Text="{Binding Level, StringFormat=Level: {0}}"
+                               Margin="0,0,0,2"/>
+                                        <TextBlock Text="{Binding Channel, StringFormat=Channel: {0}}"
+                               Margin="0,0,0,4"/>
+                                        <TextBlock Text="Message:" FontWeight="SemiBold"/>
+                                        <TextBlock Text="{Binding Message}"
+                               TextWrapping="Wrap"
+                               Margin="0,2,0,0"/>
+                                    </StackPanel>
+                                </Border>
+                            </DataTemplate>
+                        </DataGrid.RowDetailsTemplate>
+
+                        <DataGrid.RowStyle>
+                            <Style TargetType="DataGridRow">
+                                <Setter Property="Cursor" Value="Hand"/>
+                                <Setter Property="ToolTip" Value="Click to expand / collapse event details"/>
+                            </Style>
+                        </DataGrid.RowStyle>
                     </DataGrid>
                 </Grid>
             </TabItem>
@@ -641,7 +797,9 @@
                                   ScrollViewer.HorizontalScrollBarVisibility="Auto"
                                   FontFamily="Segoe UI"
                                   FontSize="13"
-                                  RowHeight="28">
+                                  RowHeight="28"
+                                  RowDetailsVisibilityMode="Collapsed"
+                                  PreviewMouseLeftButtonDown="LogsDataGrid_PreviewMouseLeftButtonDown">
                             <DataGrid.Resources>
                                 <Style TargetType="DataGridRow">
                                     <Style.Triggers>
@@ -667,6 +825,7 @@
                                     </Style.Triggers>
                                 </Style>
                             </DataGrid.Resources>
+
                             <DataGrid.Columns>
                                 <DataGridTextColumn Header="Time" Binding="{Binding Time, StringFormat={}{0:MM/dd/yyyy HH:mm:ss}}" Width="180"/>
                                 <DataGridTextColumn Header="Level" Binding="{Binding Level}" Width="120"/>
@@ -675,11 +834,40 @@
                                         <Style TargetType="TextBlock">
                                             <Setter Property="TextTrimming" Value="CharacterEllipsis"/>
                                             <Setter Property="ToolTip" Value="{Binding Message}"/>
-                                            <Setter Property="TextWrapping" Value="Wrap"/>
+                                            <Setter Property="TextWrapping" Value="NoWrap"/>
                                         </Style>
                                     </DataGridTextColumn.ElementStyle>
                                 </DataGridTextColumn>
                             </DataGrid.Columns>
+
+                            <DataGrid.RowDetailsTemplate>
+                                <DataTemplate>
+                                    <Border Margin="4"
+                    Padding="6"
+                    Background="#FAFCFE"
+                    BorderBrush="#D0DDE8"
+                    BorderThickness="1"
+                    CornerRadius="4">
+                                        <StackPanel>
+                                            <TextBlock Text="{Binding Time, StringFormat=Time: {0:MM/dd/yyyy HH:mm:ss}}"
+                               FontWeight="Bold" Margin="0,0,0,2"/>
+                                            <TextBlock Text="{Binding Level, StringFormat=Level: {0}}"
+                               Margin="0,0,0,4"/>
+                                            <TextBlock Text="Message:" FontWeight="SemiBold"/>
+                                            <TextBlock Text="{Binding Message}"
+                               TextWrapping="Wrap"
+                               Margin="0,2,0,0"/>
+                                        </StackPanel>
+                                    </Border>
+                                </DataTemplate>
+                            </DataGrid.RowDetailsTemplate>
+
+                            <DataGrid.RowStyle>
+                                <Style TargetType="DataGridRow">
+                                    <Setter Property="Cursor" Value="Hand"/>
+                                    <Setter Property="ToolTip" Value="Click to expand / collapse full log entry"/>
+                                </Style>
+                            </DataGrid.RowStyle>
                         </DataGrid>
                     </Border>
                 </Grid>

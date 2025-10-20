@@ -20,12 +20,10 @@ namespace MDE_Monitoring_App
                 DataContext = new MainViewModel();
         }
 
-        private void RefreshButton_Click(object sender, RoutedEventArgs e)
+        private async void RefreshButton_Click(object sender, RoutedEventArgs e)
         {
             if (DataContext is MainViewModel vm)
-            {
-                _ = vm.RefreshDataAsync();
-            }
+                await vm.RefreshDataAsync();
         }
 
         private async Task RefreshDeviceControlPoliciesAsync()
@@ -105,6 +103,77 @@ namespace MDE_Monitoring_App
                     }
                 }
 
+                row.DetailsVisibility = Visibility.Visible;
+                row.IsSelected = true;
+                e.Handled = true;
+            }
+        }
+
+        private void LogsDataGrid_PreviewMouseLeftButtonDown(object sender, MouseButtonEventArgs e)
+        {
+            if (sender is not DataGrid grid) return;
+
+            var dep = (DependencyObject)e.OriginalSource;
+
+            // Walk up to row or header
+            while (dep != null && dep is not DataGridRow && dep is not DataGridColumnHeader)
+                dep = VisualTreeHelper.GetParent(dep);
+
+            if (dep is DataGridColumnHeader) return;
+            if (dep is not DataGridRow row) return;
+
+            // Toggle this row
+            if (row.DetailsVisibility == Visibility.Visible)
+            {
+                row.DetailsVisibility = Visibility.Collapsed;
+                e.Handled = true;
+            }
+            else
+            {
+                // Collapse others (optional: remove loop to allow multiple open)
+                foreach (var item in grid.Items)
+                {
+                    if (grid.ItemContainerGenerator.ContainerFromItem(item) is DataGridRow r &&
+                        r != row &&
+                        r.DetailsVisibility == Visibility.Visible)
+                    {
+                        r.DetailsVisibility = Visibility.Collapsed;
+                    }
+                }
+                row.DetailsVisibility = Visibility.Visible;
+                row.IsSelected = true;
+                e.Handled = true;
+            }
+        }
+
+        private void AppControlDataGrid_PreviewMouseLeftButtonDown(object sender, MouseButtonEventArgs e)
+        {
+            if (sender is not DataGrid grid) return;
+
+            var dep = (DependencyObject)e.OriginalSource;
+            while (dep != null && dep is not DataGridRow && dep is not DataGridColumnHeader)
+                dep = VisualTreeHelper.GetParent(dep);
+
+            if (dep is DataGridColumnHeader) return;
+            if (dep is not DataGridRow row) return;
+
+            if (row.DetailsVisibility == Visibility.Visible)
+            {
+                row.DetailsVisibility = Visibility.Collapsed;
+                e.Handled = true;
+            }
+            else
+            {
+                // Collapse others so only one expanded (remove loop if multi-expand desired)
+                foreach (var item in grid.Items)
+                {
+                    if (grid.ItemContainerGenerator.ContainerFromItem(item) is DataGridRow r &&
+                        r != row &&
+                        r.DetailsVisibility == Visibility.Visible)
+                    {
+                        r.DetailsVisibility = Visibility.Collapsed;
+                    }
+                }
                 row.DetailsVisibility = Visibility.Visible;
                 row.IsSelected = true;
                 e.Handled = true;

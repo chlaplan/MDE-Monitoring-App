@@ -10,6 +10,7 @@ using MDE_Monitoring_App.Models;
 using MDE_Monitoring_App.Services;
 using System.IO;
 using System.Threading;
+using System.Text;
 
 namespace MDE_Monitoring_App
 {
@@ -25,11 +26,14 @@ namespace MDE_Monitoring_App
         private readonly AppControlLogService _appControlLogService = new();
         private readonly DeviceGuardStatusService _deviceGuardStatusService = new();
         private readonly WfpFilterService _wfpFilterService = new(WfpFilterCountMode.LegacyDoubleNameHeuristic, preserveXmlForDebug: true);
-        private readonly DeviceControlPolicyService _deviceControlPolicyService = new(); // NEW
+        private readonly DeviceControlPolicyService _deviceControlPolicyService = new();
+        private readonly FirewallStatusService _firewallStatusService = new();
+        private readonly RemoteSystemInfoService _remoteSystemInfoService = new();
+
 
         public ObservableCollection<LogEntry> Logs { get; } = new();
-        public ObservableCollection<DeviceControlPolicyGroup>? DeviceControlPolicyGroups { get; private set; } // NEW (already declared earlier in planning)
-        public ObservableCollection<DeviceControlPolicyRule>? DeviceControlPolicyRules { get; private set; }   // NEW
+        public ObservableCollection<DeviceControlPolicyGroup>? DeviceControlPolicyGroups { get; private set; }
+        public ObservableCollection<DeviceControlPolicyRule>? DeviceControlPolicyRules { get; private set; }
         private ObservableCollection<DeviceControlEvent> _deviceControlEvents = new();
         public ObservableCollection<DeviceControlEvent> DeviceControlEvents
         {
@@ -42,7 +46,6 @@ namespace MDE_Monitoring_App
         public ObservableCollection<AppControlEvent> AppControlEvents { get; } = new();
         public ObservableCollection<WfpRuleNameCount> WfpRuleCounts { get; } = new();
 
-        // NEW: Status text for Device Control Policies loading
         private string? _deviceControlPolicyStatus = "Not loaded";
         public string? DeviceControlPolicyStatus
         {
@@ -215,6 +218,10 @@ namespace MDE_Monitoring_App
 
             DefenderStatus.PropertyChanged += DefenderStatusOnPropertyChanged;
 
+            // Initialize remote execution defaults
+            UsePsExec = false;                // default to WinRM
+            PsExecPath = @"C:\Sysinternals\PsExec.exe";
+
             _ = RefreshDataAsync();
         }
 
@@ -363,6 +370,20 @@ namespace MDE_Monitoring_App
             }
         }
 
+        private string? _wfpModeDiagnostics;
+        public string? WfpModeDiagnostics
+        {
+            get => _wfpModeDiagnostics;
+            private set { if (_wfpModeDiagnostics != value) { _wfpModeDiagnostics = value; OnPropertyChanged(); } }
+        }
+
+        private string? _wfpRemoteStatusNote;
+        public string? WfpRemoteStatusNote
+        {
+            get => _wfpRemoteStatusNote;
+            private set { if (_wfpRemoteStatusNote != value) { _wfpRemoteStatusNote = value; OnPropertyChanged(); } }
+        }
+
         public string WfpFilterCountStatus
         {
             get
@@ -378,44 +399,191 @@ namespace MDE_Monitoring_App
             WfpFilterCountStatus switch
             {
                 "High" => ">= 50,000 filters: potential performance / manageability impact.",
-                "Large" => ">= 10,000 filters: elevated count – monitor growth.",
+                "Large" => ">= 30,000 filters: elevated count – monitor growth.",
                 "Normal" => "Filter count within typical range.",
                 _ => "Filter count not available."
             };
 
-        public async Task RefreshDataAsync()
+        private IReadOnlyList<FirewallProfileStatus> _firewallProfileStatusesDisplay = Array.Empty<FirewallProfileStatus>();
+        public IReadOnlyList<FirewallProfileStatus> FirewallProfileStatusesDisplay
         {
+            get => _firewallProfileStatusesDisplay;
+            private set
+            {
+                _firewallProfileStatusesDisplay = value;
+                OnPropertyChanged();
+                OnPropertyChanged(nameof(FirewallProfilesDisplay));
+                OnPropertyChanged(nameof(FirewallProfilesMultilineDisplay));
+            }
+        }
+
+        // (Keep original single-line property if other bindings rely on it)
+        public string FirewallProfilesDisplay
+        {
+            get
+            {
+                if (FirewallProfileStatusesDisplay.Count == 0) return "Firewall: Unknown";
+                return string.Join(" | ", FirewallProfileStatusesDisplay);
+            }
+        }
+
+        // NEW: Multiline, aligned formatting (monospace friendly)
+        public string FirewallProfilesMultilineDisplay
+        {
+            get
+            {
+                if (FirewallProfileStatusesDisplay.Count == 0) return "Firewall: Unknown";
+                // Order for consistent display: Domain, Private, Public
+                var order = new[] { "Domain", "Private", "Public" };
+                var profiles = FirewallProfileStatusesDisplay
+                    .OrderBy(p => Array.IndexOf(order, p.Profile) switch { -1 => 999, var idx => idx })
+                    .ThenBy(p => p.Profile, StringComparer.OrdinalIgnoreCase);
+
+                var sb = new StringBuilder();
+                sb.Append("Firewall Profiles:");
+                foreach (var p in profiles)
+                {
+                    // Example line:
+                    //   Domain  : On  In:Block  Out:Allow
+                    sb.AppendLine();
+                    sb.Append("  ")
+                      .Append(p.Profile.PadRight(7)) // width for alignment (Domain=6, Private=7, Public=6)
+                      .Append(" : ")
+                      .Append(p.Enabled ? "On " : "Off")
+                      .Append("  In:")
+                      .Append(p.InboundPolicy)
+                      .Append("  Out:")
+                      .Append(p.OutboundPolicy);
+                }
+                return sb.ToString();
+            }
+        }
+
+        private string _targetMachine = "localhost";
+        public string TargetMachine
+        {
+            get => _targetMachine;
+            set
+            {
+                var normalized = string.IsNullOrWhiteSpace(value) ? "localhost" : value.Trim();
+                if (!string.Equals(_targetMachine, normalized, StringComparison.OrdinalIgnoreCase))
+                {
+                    _targetMachine = normalized;
+                    OnPropertyChanged();
+                    OnPropertyChanged(nameof(IsRemote));
+                    OnPropertyChanged(nameof(TargetMachineStatus));
+                }
+            }
+        }
+
+        private static bool IsLocalHostName(string value)
+        {
+            if (string.IsNullOrWhiteSpace(value)) return true;
+            var h = value.Trim().ToLowerInvariant();
+            if (h is "localhost" or "." or "127.0.0.1" or "::1") return true;
+            var local = Environment.MachineName.ToLowerInvariant();
+            if (h == local) return true;
             try
             {
-                // Existing parallel loads
-                var dcTask = Task.Run(() => DeviceControlService.LoadLatestDeviceControlEvents());
-                var logsTask = Task.Run(() => _logCollector.GetDefenderLogs());
-                var statusTask = Task.Run(_defenderStatusService.GetStatus);
-                var firewallTask = Task.Run(() => _firewallLogService.LoadRecentDrops(200));
-                var wfpTask = _wfpFilterService.GetFilterSummaryAsync();
-                var policyTask = Task.Run(_policyService.LoadPolicies);
-                var latestTask = _latestVersionService.GetLatestAsync();
-                var intuneSyncTask = Task.Run(_intuneSyncService.GetLastSync);
-                var appControlStatusTask = Task.Run(_appControlStatusService.GetStatus);
-                var appControlLogsTask = Task.Run(() => _appControlLogService.GetRecent(150));
-                var deviceGuardTask = Task.Run(_deviceGuardStatusService.GetStatus);
-                DeviceControlPolicyStatus = "Loading..."; // NEW
-                var dcPoliciesTask = _deviceControlPolicyService.GetSnapshotAsync(
-                    fallbackGroupsFile: "SamplePolicies/PolicyGroups.txt",
-                    fallbackRulesFile: "SamplePolicies/PolicyRules.txt");
+                var dns = System.Net.Dns.GetHostName().ToLowerInvariant();
+                if (h == dns) return true;
+                var full = System.Net.Dns.GetHostEntry(dns).HostName.ToLowerInvariant();
+                if (h == full) return true;
+            }
+            catch { }
+            return false;
+        }
 
-                var dcEvents = await dcTask.ConfigureAwait(false);
-                var newLogs = await logsTask.ConfigureAwait(false);
-                var newStatus = await statusTask.ConfigureAwait(false);
-                var fwEvents = await firewallTask.ConfigureAwait(false);
-                var wfpSummary = await wfpTask.ConfigureAwait(false);
-                var policies = await policyTask.ConfigureAwait(false);
-                var latest = await latestTask.ConfigureAwait(false);
-                var intuneLastSync = await intuneSyncTask.ConfigureAwait(false);
+        public bool IsRemote => !IsLocalHostName(TargetMachine);
+
+        public string TargetMachineStatus => IsRemote ? $"Remote: {TargetMachine}" : "Local";
+
+        private bool _isBusy;
+        public bool IsBusy
+        {
+            get => _isBusy;
+            private set
+            {
+                if (_isBusy != value)
+                {
+                    _isBusy = value;
+                    OnPropertyChanged();
+                }
+            }
+        }
+
+        public async Task RefreshDataAsync()
+        {
+            if (IsBusy) return;
+            IsBusy = true;
+            try
+            {
+                using var refreshCts = new CancellationTokenSource(TimeSpan.FromSeconds(30));
+                var remoteOpts = BuildRemoteOptions();
+
+                var dcTask              = Task.Run(() => DeviceControlService.LoadLatestDeviceControlEvents(IsRemote ? TargetMachine : null, 500, refreshCts.Token), refreshCts.Token);
+                var logsTask            = Task.Run(() => _logCollector.GetDefenderLogs(IsRemote ? TargetMachine : null, remoteOpts, refreshCts.Token), refreshCts.Token);
+                var statusTask          = Task.Run(() => _defenderStatusService.GetStatus(IsRemote ? TargetMachine : null, remoteOpts?.LongTimeout ?? TimeSpan.FromSeconds(5)), refreshCts.Token);
+                var firewallTask        = Task.Run(() => _firewallLogService.LoadRecentDrops(200, IsRemote ? TargetMachine : null, refreshCts.Token), refreshCts.Token);
+                // UPDATED: use safe remote-capable WFP enumeration
+                _wfpFilterService.UsePsExecFallback = UsePsExec;
+                _wfpFilterService.PsExecCustomPath = string.IsNullOrWhiteSpace(PsExecPath) ? null : PsExecPath;
+                var wfpTask             = _wfpFilterService.GetFilterSummarySafeAsync(
+                    IsRemote ? TargetMachine : null,
+                    includeRuleCounts: true,
+                    ct: refreshCts.Token,
+                    timeout: remoteOpts?.LongTimeout ?? TimeSpan.FromSeconds(25));
+                _policyService.UsePsExec = UsePsExec;
+                _policyService.PsExecCustomPath = string.IsNullOrWhiteSpace(PsExecPath) ? null : PsExecPath;
+                var policyTask          = Task.Run(() => _policyService.LoadPolicies(IsRemote ? TargetMachine : null), refreshCts.Token);
+                var latestTask          = _latestVersionService.GetLatestAsync();
+                var intuneSyncTask      = Task.Run(_intuneSyncService.GetLastSync, refreshCts.Token);
+                var appControlStatusTask= Task.Run(_appControlStatusService.GetStatus, refreshCts.Token);
+                var appControlLogsTask  = Task.Run(() => _appControlLogService.GetRecent(IsRemote ? TargetMachine : null, 150, refreshCts.Token, remoteOpts?.ShortTimeout ?? TimeSpan.FromSeconds(8), remoteOpts), refreshCts.Token);
+                var deviceGuardTask     = Task.Run(_deviceGuardStatusService.GetStatus, refreshCts.Token);
+                DeviceControlPolicyStatus = "Loading...";
+                var dcPoliciesTask      = _deviceControlPolicyService.GetSnapshotAsync(
+                    fallbackGroupsFile: "SamplePolicies/PolicyGroups.txt",
+                    fallbackRulesFile: "SamplePolicies/PolicyRules.txt",
+                    ct: refreshCts.Token,
+                    targetMachine: IsRemote ? TargetMachine : null);
+                var fwStatusTask = Task.Run(() => _firewallStatusService.GetStatus(IsRemote ? TargetMachine : null, TimeSpan.FromSeconds(12), refreshCts.Token), refreshCts.Token);
+
+                // Await
+                var dcEvents         = await dcTask.ConfigureAwait(false);
+                var newLogs          = await logsTask.ConfigureAwait(false);
+                var newStatus        = await statusTask.ConfigureAwait(false);
+                var fwEvents         = await firewallTask.ConfigureAwait(false);
+                var wfpSummary       = await wfpTask.ConfigureAwait(false);
+                var policies         = await policyTask.ConfigureAwait(false);
+                var latest           = await latestTask.ConfigureAwait(false);
+                var intuneLastSync   = await intuneSyncTask.ConfigureAwait(false);
                 var appControlStatus = await appControlStatusTask.ConfigureAwait(false);
-                var appControlLogs = await appControlLogsTask.ConfigureAwait(false);
-                var deviceGuardStatus = await deviceGuardTask.ConfigureAwait(false);
-                var dcPoliciesSnapshot = await dcPoliciesTask.ConfigureAwait(false); // NEW
+                var appControlLogs   = await appControlLogsTask.ConfigureAwait(false);
+                var deviceGuardStatus= await deviceGuardTask.ConfigureAwait(false);
+                var dcPoliciesSnapshot = await dcPoliciesTask.ConfigureAwait(false);
+                var fwProfiles       = await fwStatusTask.ConfigureAwait(false);
+
+                if (IsRemote)
+                {
+                    var caps = new List<string>
+                    {
+                        "DefenderStatus:" + (string.IsNullOrWhiteSpace(newStatus?.AMProductVersion) ? "FAIL" : "OK"),
+                        "Policies:"       + (policies?.Any() == true ? "OK" : "FAIL"),
+                        "DeviceControlPolicy:" + (dcPoliciesSnapshot?.Rules?.Any() == true ? "OK" : "FAIL"),
+                        "DefenderLogs:"   + (newLogs?.Any() == true ? "OK" : "FAIL"),
+                        "AppControlLogs:" + (appControlLogs?.Any() == true ? "OK" : "FAIL"),
+                        "FirewallDrops:"  + (fwEvents?.Any() == true ? "OK" : "FAIL"),
+                        "WFP:"            + ((wfpSummary?.TotalFilterCount ?? 0) > 0 ? "OK" : "EMPTY")
+                    };
+                    if (!string.IsNullOrEmpty(wfpSummary?.RemoteStatusNote))
+                        caps.Add("WFPNote:" + wfpSummary.RemoteStatusNote);
+                    RemoteCapabilityStatus = string.Join(" | ", caps);
+                }
+                else
+                {
+                    RemoteCapabilityStatus = "Local Full";
+                }
 
                 App.Current.Dispatcher.Invoke(() =>
                 {
@@ -432,24 +600,45 @@ namespace MDE_Monitoring_App
                     foreach (var p in policies) DefenderPolicies.Add(p);
                     PolicyView.Refresh();
 
-                    DefenderStatus.AMProductVersion = newStatus.AMProductVersion;
-                    DefenderStatus.AMEngineVersion = newStatus.AMEngineVersion;
-                    DefenderStatus.AMRunningMode = newStatus.AMRunningMode;
-                    DefenderStatus.RealTimeProtection = newStatus.RealTimeProtection;
-                    DefenderStatus.AntivirusSignatureAge = newStatus.AntivirusSignatureAge;
-                    DefenderStatus.AntispywareSignatureAge = newStatus.AntispywareSignatureAge;
-                    DefenderStatus.DeviceControlDefaultEnforcement = newStatus.DeviceControlDefaultEnforcement;
-                    DefenderStatus.DeviceControlState = newStatus.DeviceControlState;
+                    DefenderStatus.AMProductVersion               = newStatus.AMProductVersion;
+                    DefenderStatus.AMEngineVersion                = newStatus.AMEngineVersion;
+                    DefenderStatus.AMRunningMode                  = newStatus.AMRunningMode;
+                    DefenderStatus.RealTimeProtection             = newStatus.RealTimeProtection;
+                    DefenderStatus.AntivirusSignatureAge          = newStatus.AntivirusSignatureAge;
+                    DefenderStatus.AntispywareSignatureAge        = newStatus.AntispywareSignatureAge;
+                    DefenderStatus.DeviceControlDefaultEnforcement= newStatus.DeviceControlDefaultEnforcement;
+                    DefenderStatus.DeviceControlState             = newStatus.DeviceControlState;
 
-                    CurrentSystem.CurrentUser = Environment.UserName;
-                    CurrentSystem.MachineName = Environment.MachineName;
-                    CurrentSystem.IPAddress = GetLocalIPAddress();
-                    CurrentSystem.JoinType = GetAADJoinType();
+                    if (IsRemote)
+                    {
+                        try
+                        {
+                            var remoteInfo = _remoteSystemInfoService.Get(TargetMachine, TimeSpan.FromSeconds(6), refreshCts.Token);
+                            CurrentSystem.MachineName = remoteInfo.MachineName;
+                            CurrentSystem.IPAddress = remoteInfo.IPAddress;
+                            CurrentSystem.JoinType = remoteInfo.JoinType;
+                            CurrentSystem.CurrentUser = remoteInfo.CurrentUser;
+                        }
+                        catch
+                        {
+                            CurrentSystem.MachineName = TargetMachine;
+                            CurrentSystem.IPAddress = "RemoteError";
+                            CurrentSystem.JoinType = "Unknown";
+                            CurrentSystem.CurrentUser = "Unknown";
+                        }
+                    }
+                    else
+                    {
+                        CurrentSystem.CurrentUser = Environment.UserName;
+                        CurrentSystem.MachineName = Environment.MachineName;
+                        CurrentSystem.IPAddress = GetLocalIPAddress();
+                        CurrentSystem.JoinType = GetAADJoinType();
+                    }
 
-                    LatestVersions = latest.versions;
+                    LatestVersions   = latest.versions;
                     LatestFetchState = latest.state;
                     LatestFetchError = latest.error;
-                    IntuneLastSyncUtc = intuneLastSync;
+                    IntuneLastSyncUtc= intuneLastSync;
 
                     AppControlStatus = appControlStatus;
 
@@ -464,18 +653,26 @@ namespace MDE_Monitoring_App
                         WfpRuleCounts.Clear();
                         foreach (var rc in wfpSummary.RuleCounts)
                             WfpRuleCounts.Add(rc);
+                        WfpModeDiagnostics = wfpSummary.ModeDiagnostics;
+                        WfpRemoteStatusNote = wfpSummary.RemoteStatusNote;
                     }
                     else
                     {
                         WfpFilterCount = null;
                         WfpRuleCounts.Clear();
+                        WfpModeDiagnostics = "No data";
+                        WfpRemoteStatusNote = null;
                     }
 
-                    // NEW: Device Control Policies integration
+                    if (fwProfiles.Count > 0)
+                        FirewallProfileStatusesDisplay = fwProfiles;
+                    else
+                        FirewallProfileStatusesDisplay = Array.Empty<FirewallProfileStatus>();
+
                     if (dcPoliciesSnapshot != null)
                     {
                         DeviceControlPolicyGroups = new ObservableCollection<DeviceControlPolicyGroup>(dcPoliciesSnapshot.Groups);
-                        DeviceControlPolicyRules = new ObservableCollection<DeviceControlPolicyRule>(dcPoliciesSnapshot.Rules);
+                        DeviceControlPolicyRules  = new ObservableCollection<DeviceControlPolicyRule>(dcPoliciesSnapshot.Rules);
                         OnPropertyChanged(nameof(DeviceControlPolicyGroups));
                         OnPropertyChanged(nameof(DeviceControlPolicyRules));
                         DeviceControlPolicyStatus = $"Groups: {dcPoliciesSnapshot.Groups.Count} | Rules: {dcPoliciesSnapshot.Rules.Count}";
@@ -484,6 +681,7 @@ namespace MDE_Monitoring_App
                     {
                         DeviceControlPolicyStatus = "No policy data";
                     }
+                    PdfExportService.UpdateRemoteCapabilityStatus(RemoteCapabilityStatus);
 
                     LastRefreshed = DateTime.Now;
                     LogsView.Refresh();
@@ -499,8 +697,14 @@ namespace MDE_Monitoring_App
                         Level = "Error",
                         Message = $"Failed to refresh: {ex.Message}"
                     });
-                    DeviceControlPolicyStatus = "Failed to load"; // NEW
+                    DeviceControlPolicyStatus = "Failed to load";
+                    RemoteCapabilityStatus = IsRemote ? "Remote refresh failed" : "Local refresh failed";
+                    PdfExportService.UpdateRemoteCapabilityStatus(RemoteCapabilityStatus);
                 });
+            }
+            finally
+            {
+                IsBusy = false;
             }
         }
 
@@ -636,5 +840,80 @@ namespace MDE_Monitoring_App
                 return false;
             }
         }
+
+        private string _remoteUser = "";
+        public string RemoteUser
+        {
+            get => _remoteUser;
+            set { if (_remoteUser != value) { _remoteUser = value.Trim(); OnPropertyChanged(); } }
+        }
+        private string _remoteDomain = "";
+        public string RemoteDomain
+        {
+            get => _remoteDomain;
+            set { if (_remoteDomain != value) { _remoteDomain = value.Trim(); OnPropertyChanged(); } }
+        }
+        private System.Security.SecureString? _remotePassword;
+        public void SetRemotePassword(System.Security.SecureString? pwd)
+        {
+            _remotePassword = pwd;
+            OnPropertyChanged(nameof(RemotePasswordSet));
+        }
+        public bool RemotePasswordSet => _remotePassword != null && _remotePassword.Length > 0;
+
+        private string _remoteCapabilityStatus = "";
+        public string RemoteCapabilityStatus
+        {
+            get => _remoteCapabilityStatus;
+            private set { if (_remoteCapabilityStatus != value) { _remoteCapabilityStatus = value; OnPropertyChanged(); } }
+        }
+
+        // NEW: PsExec toggle + path (default path)
+        private bool _usePsExec;
+        public bool UsePsExec
+        {
+            get => _usePsExec;
+            set
+            {
+                if (_usePsExec != value)
+                {
+                    _usePsExec = value;
+                    _wfpFilterService.UsePsExecFallback = value; // propagate to service
+                    OnPropertyChanged();
+                }
+            }
+        }
+
+        private string _psExecPath = @"C:\Sysinternals\PsExec.exe";
+        public string PsExecPath
+        {
+            get => _psExecPath;
+            set
+            {
+                var norm = string.IsNullOrWhiteSpace(value) ? @"C:\Sysinternals\PsExec.exe" : value.Trim();
+                if (_psExecPath != norm)
+                {
+                    _psExecPath = norm;
+                    _wfpFilterService.PsExecCustomPath = norm; // propagate to service
+                    OnPropertyChanged();
+                }
+            }
+        }
+
+        // Helper object passed to services
+        private RemoteAccessOptions? BuildRemoteOptions()
+        {
+            if (!IsRemote) return null;
+            return new RemoteAccessOptions(TargetMachine, RemoteDomain, RemoteUser, _remotePassword,
+                TimeSpan.FromSeconds(6), TimeSpan.FromSeconds(10));
+        }
+
+        public record RemoteAccessOptions(
+            string Host,
+            string? Domain,
+            string? User,
+            System.Security.SecureString? Password,
+            TimeSpan ShortTimeout,
+            TimeSpan LongTimeout);
     }
 }

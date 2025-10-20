@@ -26,14 +26,17 @@ namespace MDE_Monitoring_App.Services
         public async Task<DeviceControlPolicySnapshot> GetSnapshotAsync(
             string? fallbackGroupsFile = null,
             string? fallbackRulesFile  = null,
-            CancellationToken ct = default)
+            CancellationToken ct = default,
+            string? targetMachine = null)
         {
             return await Task.Run(() =>
             {
                 ct.ThrowIfCancellationRequested();
 
-                string? groupsXml = ReadRegistryString(GroupsValueName);
-                string? rulesXml  = ReadRegistryString(RulesValueName);
+                using RegistryKey? hklm = OpenHive(targetMachine);
+
+                string? groupsXml = ReadRegistryString(hklm, GroupsValueName);
+                string? rulesXml  = ReadRegistryString(hklm, RulesValueName);
 
                 if (string.IsNullOrWhiteSpace(groupsXml) && !string.IsNullOrWhiteSpace(fallbackGroupsFile) && File.Exists(fallbackGroupsFile))
                     groupsXml = File.ReadAllText(fallbackGroupsFile);
@@ -56,6 +59,22 @@ namespace MDE_Monitoring_App.Services
 
                 return new DeviceControlPolicySnapshot(groups, rules);
             }, ct).ConfigureAwait(false);
+        }
+
+        private static RegistryKey? OpenHive(string? machine)
+        {
+            if (string.IsNullOrWhiteSpace(machine) ||
+                string.Equals(machine, "localhost", StringComparison.OrdinalIgnoreCase) ||
+                string.Equals(machine, ".", StringComparison.OrdinalIgnoreCase))
+                return Registry.LocalMachine;
+            try
+            {
+                return RegistryKey.OpenRemoteBaseKey(RegistryHive.LocalMachine, machine);
+            }
+            catch
+            {
+                return Registry.LocalMachine; // fallback
+            }
         }
 
         private static string SummarizeEntries(DeviceControlPolicyRule rule)
@@ -88,13 +107,12 @@ namespace MDE_Monitoring_App.Services
             return string.Join(" | ", parts);
         }
 
-        private static string? ReadRegistryString(string valueName)
+        private static string? ReadRegistryString(RegistryKey? hklm, string valueName)
         {
             try
             {
-                using var key = Registry.LocalMachine.OpenSubKey(RegistryBasePath, writable: false);
-                if (key == null) return null;
-                var obj = key.GetValue(valueName);
+                using var key = hklm?.OpenSubKey(RegistryBasePath, writable: false);
+                var obj = key?.GetValue(valueName);
                 return obj as string;
             }
             catch

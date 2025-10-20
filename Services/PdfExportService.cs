@@ -6,7 +6,7 @@ using QuestPDF.Fluent;
 using QuestPDF.Helpers;
 using QuestPDF.Infrastructure;
 using MDE_Monitoring_App.Models;
-using MDE_Monitoring_App.Services; // for WfpRuleNameCount
+using MDE_Monitoring_App.Services; 
 
 namespace MDE_Monitoring_App.Services
 {
@@ -45,7 +45,10 @@ namespace MDE_Monitoring_App.Services
                 IntuneLastSyncUtc = vm.IntuneLastSyncUtc,
                 FirewallLoggingStatus = vm.FirewallLoggingStatusMessage ?? string.Empty,
                 WfpFilterCount = vm.WfpFilterCount,
-                WfpRuleCounts = vm.WfpRuleCounts?.ToList() ?? new()
+                WfpRuleCounts = vm.WfpRuleCounts?.ToList() ?? new(),
+                IsRemote = vm.IsRemote,
+                TargetMachine = vm.TargetMachine,
+                WfpDiagnostics = vm.WfpFilterCount.HasValue ? null : "WFP summary unavailable (permission or remote unsupported)." // simple hint
             };
         }
 
@@ -76,10 +79,12 @@ namespace MDE_Monitoring_App.Services
                 r.RelativeItem().Column(col =>
                 {
                     col.Item().Text("MDE / Endpoint Security Summary").FontSize(18).SemiBold().FontColor(Colors.Blue.Medium);
+                    col.Item().Text($"Source: {(s.IsRemote ? "Remote" : "Local")} {(s.IsRemote ? "(" + (s.TargetMachine ?? "") + ")" : "")}"); // PHASE6
                     col.Item().Text($"Machine: {sys.MachineName ?? ""}");
                     col.Item().Text($"User: {sys.CurrentUser ?? ""}");
                     col.Item().Text($"Platform: {s.PlatformStatusText}");
                     col.Item().Text($"Engine: {s.EngineStatusText}");
+                    col.Item().Text($"Remote Capability: {(s.IsRemote ? (RemoteCapabilityStatusCache ?? "Unknown") : "Local Full")}").FontSize(10); // PHASE 7
                 });
                 r.ConstantItem(120).AlignRight().Text(DateTime.Now.ToString("G")).FontSize(10);
             });
@@ -94,6 +99,7 @@ namespace MDE_Monitoring_App.Services
                 {
                     section.Item().Text($"IP: {sys.IPAddress ?? ""}");
                     section.Item().Text($"Join Type: {sys.JoinType ?? ""}");
+                    if (s.IsRemote) section.Item().Text("Remote Collection: Windows integrated credentials").FontColor(Colors.Green.Darken2); // PHASE6
                 });
 
                 Section(col, "Defender Status", section =>
@@ -154,7 +160,6 @@ namespace MDE_Monitoring_App.Services
                     Section(col, "WFP Filters", section =>
                     {
                         section.Item().Text(text).FontColor(noteColor).SemiBold();
-
                         if (s.WfpRuleCounts != null && s.WfpRuleCounts.Count > 0)
                         {
                             var top = s.WfpRuleCounts.Take(15).ToList();
@@ -180,6 +185,21 @@ namespace MDE_Monitoring_App.Services
                         }
                     });
                 }
+                else
+                {
+                    Section(col, "WFP Filters", section =>
+                    {
+                        section.Item().Text(s.WfpDiagnostics ?? "WFP data not collected").FontColor(Colors.Grey.Darken2); // PHASE6
+                    });
+                }
+
+                // PHASE6: Remote disclaimers
+                Section(col, "Collection Notes", section =>
+                {
+                    section.Item().Text(s.IsRemote
+                        ? "Remote collection may omit WFP detailed enumeration and some real-time states due to protocol limitations."
+                        : "Local collection provides full detail set.").FontSize(9).FontColor(Colors.Grey.Darken2);
+                });
 
                 TableSection(col, "Firewall Drops", s.FirewallEvents,
                     new[] { "Time", "Proto", "Src", "Dst", "SPort", "DPort", "Info" },
@@ -235,6 +255,7 @@ namespace MDE_Monitoring_App.Services
                         l?.Level ?? "",
                         Shorten(l?.Message, 120)
                     });
+
             });
         }
 
@@ -324,6 +345,12 @@ namespace MDE_Monitoring_App.Services
             public string FirewallLoggingStatus { get; set; } = "";
             public int? WfpFilterCount { get; set; }
             public List<WfpRuleNameCount> WfpRuleCounts { get; set; } = new();
+            public bool IsRemote { get; set; }
+            public string? TargetMachine { get; set; }
+            public string? WfpDiagnostics { get; set; }
         }
+
+        public static string? RemoteCapabilityStatusCache { get; private set; }
+        public static void UpdateRemoteCapabilityStatus(string? val) => RemoteCapabilityStatusCache = val;
     }
 }

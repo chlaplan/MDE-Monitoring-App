@@ -26,10 +26,27 @@
   </ItemGroup>
 
   <ItemGroup>
-    <Resource Include="Resources\microsoft_defender_icon.png" />
-    <Resource Include="Resources\microsoft_defender_icon.ico" />
+    <Resource Include="Resources\microsoft_defender_icon.png">
+      <CopyToOutputDirectory></CopyToOutputDirectory>
+    </Resource>
+    <Resource Include="Resources\microsoft_defender_icon.ico">
+      <CopyToOutputDirectory></CopyToOutputDirectory>
+    </Resource>
     <None Include="Data\DefenderPolicyDefinitions.json">
       <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+    </None>
+  </ItemGroup>
+
+  <ItemGroup>
+    <Folder Include="Tools\PsExec\" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <None Update="Tools\PsExec\PsExec.exe">
+      <CopyToOutputDirectory>Never</CopyToOutputDirectory>
+    </None>
+    <None Update="Tools\PsExec\PsExec64.exe">
+      <CopyToOutputDirectory>Never</CopyToOutputDirectory>
     </None>
   </ItemGroup>
 

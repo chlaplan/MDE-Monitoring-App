@@ -2,94 +2,177 @@ using System;
 using System.Collections.Generic;
 using System.IO;
 using System.Linq;
+using System.Net;
 using System.Text.RegularExpressions;
 using Microsoft.Win32;
 using MDE_Monitoring_App.Models;
+using System.Threading;
 
 namespace MDE_Monitoring_App.Services
 {
     public class FirewallLogService
     {
         private const string FirewallPolicyRoot = @"SYSTEM\CurrentControlSet\Services\SharedAccess\Parameters\FirewallPolicy";
-
-        // Registry subkeys mapping to profiles (StandardProfile = Private)
         private static readonly (string RegSubKey, string FriendlyName)[] ProfileKeys =
         {
             ("DomainProfile",  "Domain"),
             ("StandardProfile","Private"),
             ("PublicProfile",  "Public")
         };
-
         private static readonly string TempDir = Path.Combine(
             Environment.GetFolderPath(Environment.SpecialFolder.CommonApplicationData),
             "MDE_Monitoring_App",
             "FirewallLogs");
-
         private static readonly Regex DateLineRegex = new(@"^\d{4}-\d{2}-\d{2}\s", RegexOptions.Compiled);
 
         public record FirewallProfileLogStatus(
             string Profile,
             string LogPath,
             bool LogDropped,
-            bool LogAllowed
+            bool LogAllowed,
+            string SourceKind,     // NEW: Local/Remote
+            string RawRegistryPath // NEW: original registry value
         );
 
         /// <summary>
-        /// Returns per-profile logging settings (path + whether dropped/allowed are logged).
+        /// Remote-aware per-profile logging settings.
         /// </summary>
-        public IReadOnlyList<FirewallProfileLogStatus> GetProfileStatuses()
+        public IReadOnlyList<FirewallProfileLogStatus> GetProfileStatuses(string? targetMachine = null)
         {
+            bool remote = IsRemote(targetMachine);
             var list = new List<FirewallProfileLogStatus>();
-            using var hklm = RegistryKey.OpenBaseKey(RegistryHive.LocalMachine, RegistryView.Registry64);
+            RegistryKey? root = null;
+            RegistryKey? ntKey = null;
+            string? remoteSystemRoot = null;
 
-            foreach (var (regSubKey, friendly) in ProfileKeys)
+            try
             {
-                string loggingKeyPath = $"{FirewallPolicyRoot}\\{regSubKey}\\Logging";
-                using var key = hklm.OpenSubKey(loggingKeyPath);
-                if (key == null) continue;
+                root = remote
+                    ? RegistryKey.OpenRemoteBaseKey(RegistryHive.LocalMachine, targetMachine!)
+                    : Registry.LocalMachine;
 
-                string? path = key.GetValue("LogFilePath") as string;
-                if (string.IsNullOrWhiteSpace(path)) path = "";
+                if (remote)
+                {
+                    try
+                    {
+                        ntKey = RegistryKey.OpenRemoteBaseKey(RegistryHive.LocalMachine, targetMachine!)
+                            .OpenSubKey(@"SOFTWARE\Microsoft\Windows NT\CurrentVersion");
+                        remoteSystemRoot = ntKey?.GetValue("SystemRoot") as string; // e.g. C:\Windows
+                    }
+                    catch { remoteSystemRoot = null; }
+                }
 
-                path = Environment.ExpandEnvironmentVariables(path.Trim());
-                try { path = Path.GetFullPath(path); } catch { /* ignore */ }
+                foreach (var (regSubKey, friendly) in ProfileKeys)
+                {
+                    string loggingKeyPath = $"{FirewallPolicyRoot}\\{regSubKey}\\Logging";
+                    using var key = root.OpenSubKey(loggingKeyPath);
+                    if (key == null) continue;
 
-                bool logDropped = (key.GetValue("LogDroppedPackets") is int d && d == 1);
-                bool logAllowed = (key.GetValue("LogSuccessfulConnections") is int a && a == 1);
+                    string raw = (key.GetValue("LogFilePath") as string ?? "").Trim();
+                    if (raw.Length == 0) continue;
 
-                list.Add(new FirewallProfileLogStatus(friendly, path, logDropped, logAllowed));
+                    string expanded = raw;
+                    // Avoid Environment.ExpandEnvironmentVariables for remote (%SystemRoot% differs). Handle manually.
+                    if (remote && remoteSystemRoot != null &&
+                        expanded.IndexOf("%systemroot%", StringComparison.OrdinalIgnoreCase) >= 0)
+                    {
+                        expanded = Regex.Replace(expanded, "%systemroot%", remoteSystemRoot, RegexOptions.IgnoreCase);
+                    }
+                    else
+                    {
+                        expanded = Environment.ExpandEnvironmentVariables(expanded); // safe for local
+                    }
+
+                    // If path lacks drive root (e.g. System32\LogFiles\Firewall\pfirewall.log) prepend remoteSystemRoot or local %SystemRoot%.
+                    if (!HasDrivePrefix(expanded))
+                    {
+                        var baseRoot = remote
+                            ? (remoteSystemRoot ?? "C:\\Windows")
+                            : (Environment.GetEnvironmentVariable("SystemRoot") ?? "C:\\Windows");
+                        expanded = Path.Combine(baseRoot, expanded.TrimStart('\\'));
+                    }
+
+                    // Normalize
+                    try { expanded = Path.GetFullPath(expanded); } catch { }
+
+                    bool logDropped = (key.GetValue("LogDroppedPackets") is int d && d == 1);
+                    bool logAllowed = (key.GetValue("LogSuccessfulConnections") is int a && a == 1);
+
+                    list.Add(new FirewallProfileLogStatus(
+                        friendly,
+                        expanded,
+                        logDropped,
+                        logAllowed,
+                        remote ? "Remote" : "Local",
+                        raw));
+                }
+
+                // Diagnostic row if remote and no entries
+                if (remote && list.Count == 0)
+                {
+                    list.Add(new FirewallProfileLogStatus(
+                        "Diagnostic",
+                        "",
+                        false,
+                        false,
+                        "Remote",
+                        "No profile logging keys found or access denied"));
+                }
+            }
+            catch (Exception ex)
+            {
+                list.Add(new FirewallProfileLogStatus(
+                    "Error",
+                    "",
+                    false,
+                    false,
+                    remote ? "Remote" : "Local",
+                    "Exception: " + ex.Message));
+            }
+            finally
+            {
+                if (root != null && remote) root.Dispose();
+                ntKey?.Dispose();
             }
 
             return list;
         }
 
         /// <summary>
-        /// Loads recent DROP firewall entries from all enabled (LogDroppedPackets==true) profile logs.
+        /// Remote-aware load of DROP entries. If targetMachine specified, uses UNC admin share copy (\\host\c$\...).
         /// </summary>
-        public IEnumerable<FirewallLogEntry> LoadRecentDrops(int max = 300)
+        public IEnumerable<FirewallLogEntry> LoadRecentDrops(int max = 300, string? targetMachine = null, CancellationToken token = default)
         {
             try
             {
-                var sources = DiscoverEnabledDropLogFiles().ToList();
+                var statuses = GetProfileStatuses(targetMachine);
+                var sources = statuses
+                    .Where(s => s.LogDropped && !string.IsNullOrWhiteSpace(s.LogPath))
+                    .Select(s => new LogSource(s.Profile, s.LogPath, s.SourceKind, s.RawRegistryPath))
+                    .ToList();
+
                 if (!sources.Any())
-                    return Error("No firewall log files found (dropped packet logging disabled or paths missing).");
+                    return Error(IsRemote(targetMachine)
+                        ? "Remote firewall log not available or logging disabled."
+                        : "No firewall log files found (dropped packet logging disabled or paths missing).");
 
                 if (!EnsureTempDirectory(out var tempErr))
                     return Error("Failed to prepare temp directory: " + tempErr);
 
                 var collected = new List<FirewallLogEntry>();
-
                 foreach (var src in sources)
                 {
-                    if (!File.Exists(src.Path))
+                    token.ThrowIfCancellationRequested();
+
+                    var resolved = ResolvePathForMachine(src.Path, targetMachine);
+                    if (!File.Exists(resolved))
                     {
-                        collected.AddRange(Error($"Log file missing for profile {src.Profile}: {src.Path}"));
+                        collected.AddRange(Error($"Missing file ({src.Profile}) Raw='{src.RawRegistryPath}' -> Resolved='{resolved}'"));
                         continue;
                     }
 
-                    string tempCopy = Path.Combine(TempDir, "MDE_" + src.Profile + "_" + Path.GetFileName(src.Path));
-
-                    if (!TryCopy(src.Path, tempCopy, out var copyErr))
+                    var tempCopy = Path.Combine(TempDir, (IsRemote(targetMachine) ? "REMOTE_" : "LOCAL_") + src.Profile + "_" + Path.GetFileName(resolved));
+                    if (!TryCopy(resolved, tempCopy, out var copyErr))
                     {
                         collected.AddRange(Error($"Copy failed ({src.Profile}): {copyErr}"));
                         continue;
@@ -98,17 +181,14 @@ namespace MDE_Monitoring_App.Services
                     try
                     {
                         var lines = File.ReadLines(tempCopy)
-                                        .Select(l => l.TrimStart())
-                                        .Where(l => !string.IsNullOrWhiteSpace(l) &&
-                                                    !l.StartsWith("#") &&
-                                                    DateLineRegex.IsMatch(l))
-                                        .ToList();
+                            .Select(l => l.TrimStart())
+                            .Where(l => !string.IsNullOrWhiteSpace(l) && !l.StartsWith("#") && DateLineRegex.IsMatch(l))
+                            .ToList();
 
                         for (int i = lines.Count - 1; i >= 0 && collected.Count < max * 4; i--)
                         {
                             var entry = ParseLine(lines[i]);
-                            if (entry != null &&
-                                entry.Action.Equals("DROP", StringComparison.OrdinalIgnoreCase))
+                            if (entry != null && entry.Action.Equals("DROP", StringComparison.OrdinalIgnoreCase))
                             {
                                 collected.Add(entry);
                             }
@@ -132,7 +212,37 @@ namespace MDE_Monitoring_App.Services
             }
         }
 
-        private sealed record LogSource(string Profile, string Path);
+        private sealed record LogSource(string Profile, string Path, string SourceKind, string RawRegistryPath);
+
+        private static bool IsRemote(string? machine) =>
+            !string.IsNullOrWhiteSpace(machine) &&
+            !machine.Equals("localhost", StringComparison.OrdinalIgnoreCase) &&
+            !machine.Equals(".", StringComparison.OrdinalIgnoreCase) &&
+            !machine.Equals(Environment.MachineName, StringComparison.OrdinalIgnoreCase);
+
+        private static bool HasDrivePrefix(string p) =>
+            p.Length > 1 && p[1] == ':' && char.IsLetter(p[0]);
+
+        // Build UNC path for remote host (supports drive-letter paths only)
+        private static string ResolvePathForMachine(string originalPath, string? machine)
+        {
+            if (!IsRemote(machine)) return originalPath;
+            if (string.IsNullOrWhiteSpace(originalPath)) return originalPath;
+
+            // If already UNC, return as-is
+            if (originalPath.StartsWith(@"\\"))
+                return originalPath;
+
+            if (HasDrivePrefix(originalPath))
+            {
+                var driveLetter = char.ToLowerInvariant(originalPath[0]);
+                var rest = originalPath.Substring(2).TrimStart('\\');
+                return $@"\\{machine}\{driveLetter}$\{rest}";
+            }
+
+            // Relative path – assume under SystemRoot
+            return $@"\\{machine}\c$\{originalPath.TrimStart('\\')}";
+        }
 
         private IEnumerable<LogSource> DiscoverEnabledDropLogFiles()
         {
@@ -140,7 +250,8 @@ namespace MDE_Monitoring_App.Services
             foreach (var s in statuses)
             {
                 if (s.LogDropped && !string.IsNullOrWhiteSpace(s.LogPath))
-                    yield return new LogSource(s.Profile, s.LogPath);
+                    // UPDATED to pass SourceKind and RawRegistryPath (record now has 4 parameters)
+                    yield return new LogSource(s.Profile, s.LogPath, s.SourceKind, s.RawRegistryPath);
             }
         }
 
