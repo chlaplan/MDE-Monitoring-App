@@ -6,7 +6,6 @@ using QuestPDF.Fluent;
 using QuestPDF.Helpers;
 using QuestPDF.Infrastructure;
 using MDE_Monitoring_App.Models;
-using MDE_Monitoring_App.Services; 
 
 namespace MDE_Monitoring_App.Services
 {
