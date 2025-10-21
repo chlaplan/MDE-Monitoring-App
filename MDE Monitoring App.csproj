@@ -37,17 +37,4 @@
     </None>
   </ItemGroup>
 
-  <ItemGroup>
-    <Folder Include="Tools\PsExec\" />
-  </ItemGroup>
-
-  <ItemGroup>
-    <None Update="Tools\PsExec\PsExec.exe">
-      <CopyToOutputDirectory>Never</CopyToOutputDirectory>
-    </None>
-    <None Update="Tools\PsExec\PsExec64.exe">
-      <CopyToOutputDirectory>Never</CopyToOutputDirectory>
-    </None>
-  </ItemGroup>
-
 </Project>
