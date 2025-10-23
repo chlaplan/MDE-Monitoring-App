@@ -4,7 +4,7 @@ using MDE_Monitoring_App.Models;
 
 namespace MDE_Monitoring_App.Services
 {
-    // Lightweight stub service (extend with real collection logic later)
+
     public static class DefenderServicestub
     {
         public static IEnumerable<LogEntry> GetRecentMDEEvents(int maxEvents = 50)

@@ -1,8 +1,7 @@
 ﻿<Application x:Class="MDE_Monitoring_App.App"
              xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
              xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
-             xmlns:local="clr-namespace:MDE_Monitoring_App"
-             StartupUri="MainWindow.xaml">
+             xmlns:local="clr-namespace:MDE_Monitoring_App">
     <Application.Resources>
         <Color x:Key="PrimaryBlueColor">#0078D4</Color>
         <Color x:Key="PrimaryLightBlueColor">#E6F0FA</Color>

@@ -30,7 +30,10 @@ namespace MDE_Monitoring_App
         {
             if (DataContext is MainViewModel vm)
             {
-                var status = vm.DeviceControlPolicyStatus;
+                await Task.Run(() =>
+                {
+                    var status = vm.DeviceControlPolicyStatus;
+                });
             }
         }
 
@@ -177,6 +180,18 @@ namespace MDE_Monitoring_App
                 row.DetailsVisibility = Visibility.Visible;
                 row.IsSelected = true;
                 e.Handled = true;
+            }
+        }
+
+        // OPTIONAL: expose usage when run with --help
+        protected override void OnContentRendered(EventArgs e)
+        {
+            base.OnContentRendered(e);
+            var args = Environment.GetCommandLineArgs();
+            if (args.Skip(1).Any(a => a is "--help" or "/?"))
+            {
+                MessageBox.Show(CommandLineOptions.Usage, "Usage",
+                    MessageBoxButton.OK, MessageBoxImage.Information);
             }
         }
     }
