@@ -9,51 +9,63 @@
         Background="#F3F3F3"
         FontFamily="Segoe UI"
         FontSize="14">
-    
+
     <Window.Resources>
         <conv:DescriptorsJoinConverter x:Key="DescriptorsJoinConverter" Separator="; " />
         <conv:AccessMaskConverter x:Key="AccessMaskConverter" />
         <BooleanToVisibilityConverter x:Key="BoolToVisibilityConverter"/>
         <conv:BooleanInverseConverter x:Key="BooleanInverseConverter"/>
     </Window.Resources>
+
     <Grid Margin="10">
+        <!-- CHANGED: Added a third row (Menu, Header, Content) to prevent overlap -->
         <Grid.RowDefinitions>
-            <RowDefinition Height="Auto"/>
-            <RowDefinition Height="*"/>
+            <RowDefinition Height="Auto"/>   <!-- Menu -->
+            <RowDefinition Height="Auto"/>   <!-- Header (title + target controls) -->
+            <RowDefinition Height="*"/>      <!-- Main content -->
         </Grid.RowDefinitions>
 
-        <!-- <TextBlock Text="Microsoft Defender for Endpoint Monitor"
-                   FontSize="22" FontWeight="Bold"
-                   Foreground="#0078D4"
-                   Margin="0,0,0,10"/> -->
+        <!-- Menu now explicitly in row 0 -->
+        <Menu Grid.Row="0">
+            <MenuItem Header="_File">
+                <MenuItem Header="_Export PDF..." Click="ExportPdf_Click" />
+                <Separator />
+                <MenuItem Header="E_xit" Click="FileExit_Click" />
+            </MenuItem>
+            <MenuItem Header="_Advanced Tools">
+                <MenuItem Header="_Netsh Trace..." Click="AdvancedNetworking_Click" />
+            </MenuItem>
+            <MenuItem Header="_Help">
+                <MenuItem Header="_Usage" Click="HelpUsage_Click" />
+                <MenuItem Header="_About" Click="HelpAbout_Click" />
+            </MenuItem>
+        </Menu>
 
-        <!-- REPLACE ONLY the existing top Grid (the one with title + target controls) with this version -->
-        <Grid Grid.Row="0" Margin="0,0,0,14">
+        <!-- Header grid moved to row 1 -->
+        <Grid Grid.Row="1" Margin="0,6,0,14">
             <Grid.RowDefinitions>
                 <RowDefinition Height="Auto"/>
                 <RowDefinition Height="Auto"/>
             </Grid.RowDefinitions>
 
-            <!-- Title row -->
-            <TextBlock Grid.Row="0"
-                       Text="Microsoft Defender for Endpoint Monitor"
+            <!-- Shortened title to avoid crowding -->
+<!--            <TextBlock Grid.Row="0"
+                       Text="MDE Monitor"
                        FontSize="22"
                        FontWeight="Bold"
                        Foreground="#0078D4"
-                       Margin="0,0,0,4"/>
+                       Margin="0,0,0,4"/>  -->
 
-            <!-- Target + Controls row -->
             <Grid Grid.Row="1">
                 <Grid.ColumnDefinitions>
-                    <ColumnDefinition Width="Auto"/>   <!-- Target label -->
-                    <ColumnDefinition Width="220"/>    <!-- Target textbox -->
-                    <ColumnDefinition Width="Auto"/>   <!-- PsExec checkbox -->
-                    <ColumnDefinition Width="250"/>    <!-- PsExec path textbox -->
-                    <ColumnDefinition Width="Auto"/>   <!-- Connect + spinner -->
-                    <ColumnDefinition Width="*"/>      <!-- Status text -->
+                    <ColumnDefinition Width="Auto"/>
+                    <ColumnDefinition Width="220"/>
+                    <ColumnDefinition Width="Auto"/>
+                    <ColumnDefinition Width="250"/>
+                    <ColumnDefinition Width="Auto"/>
+                    <ColumnDefinition Width="*"/>
                 </Grid.ColumnDefinitions>
 
-                <!-- Target label -->
                 <TextBlock Grid.Column="0"
                            Text="Target:"
                            VerticalAlignment="Center"
@@ -61,7 +73,6 @@
                            Foreground="#0078D4"
                            Margin="0,0,8,0"/>
 
-                <!-- Target textbox -->
                 <TextBox Grid.Column="1"
                          Text="{Binding TargetMachine, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}"
                          VerticalAlignment="Center"
@@ -71,7 +82,6 @@
                          Width="200"
                          TextWrapping="NoWrap"/>
 
-                <!-- Use PsExec checkbox -->
                 <CheckBox Grid.Column="2"
                           Content="Use PsExec"
                           IsChecked="{Binding UsePsExec, Mode=TwoWay}"
@@ -79,7 +89,6 @@
                           Margin="12,0,0,0"
                           ToolTip="Use PsExec for remote WFP enumeration (unchecked = WinRM Invoke-Command)"/>
 
-                <!-- PsExec path textbox -->
                 <TextBox Grid.Column="3"
                          Text="{Binding PsExecPath, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}"
                          VerticalAlignment="Center"
@@ -87,7 +96,6 @@
                          Padding="4,2"
                          ToolTip="Path to PsExec.exe (e.g. C:\Sysinternals\PsExec.exe). Must exist if Use PsExec is checked."/>
 
-                <!-- Connect button + spinner (single instance) -->
                 <StackPanel Grid.Column="4"
                             Orientation="Horizontal"
                             VerticalAlignment="Center"
@@ -99,11 +107,9 @@
                             Foreground="White"
                             IsEnabled="{Binding IsBusy, Converter={StaticResource BooleanInverseConverter}, FallbackValue=True}"
                             ToolTip="Fetch data from the specified machine"/>
-                    <!-- Busy spinner -->
                     <Grid Width="28" Height="28" Margin="10,0,0,0"
                           Visibility="{Binding IsBusy, Converter={StaticResource BoolToVisibilityConverter}}">
                         <Canvas Width="28" Height="28">
-                            <!-- 8 dots circle (radius ~10, center 14,14) -->
                             <Ellipse Width="5" Height="5" Fill="#0078D4" Canvas.Left="22" Canvas.Top="13" Opacity="1"/>
                             <Ellipse Width="5" Height="5" Fill="#0078D4" Canvas.Left="21" Canvas.Top="19" Opacity="0.85"/>
                             <Ellipse Width="5" Height="5" Fill="#0078D4" Canvas.Left="14" Canvas.Top="22" Opacity="0.7"/>
@@ -129,7 +135,6 @@
                     </Grid>
                 </StackPanel>
 
-                <!-- Status text -->
                 <TextBlock Grid.Column="5"
                            Margin="18,0,0,0"
                            VerticalAlignment="Center"
@@ -140,10 +145,13 @@
                            Text="{Binding TargetMachineStatus}"/>
             </Grid>
         </Grid>
-        <TabControl Grid.Row="1">
 
+        <!-- Main tab content now in row 2 -->
+        <TabControl Grid.Row="2">
+            <!-- (UNCHANGED existing TabItems) -->
             <!-- Overview Tab -->
             <TabItem Header="Overview">
+                <!-- existing content unchanged -->
                 <StackPanel Margin="10">
                     <StackPanel Orientation="Horizontal" Margin="0,0,0,10">
                         <TextBlock Text="Defender Status" FontSize="18" FontWeight="Bold" Foreground="#0078D4" VerticalAlignment="Center"/>

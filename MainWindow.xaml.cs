@@ -6,6 +6,9 @@ using System.Windows.Controls.Primitives;
 using System.Windows.Input;
 using System.Windows.Media;
 using System.Windows.Media.Imaging;
+using System;
+using System.Linq;
+using System.Reflection;
 
 namespace MDE_Monitoring_App
 {
@@ -15,7 +18,6 @@ namespace MDE_Monitoring_App
         {
             InitializeComponent();
             Icon = new BitmapImage(new Uri("pack://application:,,,/Resources/microsoft_defender_icon.png"));
-            // Ensure DataContext is set so bindings work
             if (DataContext is null)
                 DataContext = new MainViewModel();
         }
@@ -80,14 +82,12 @@ namespace MDE_Monitoring_App
 
             var dep = (DependencyObject)e.OriginalSource;
 
-            // Ignore header clicks
             while (dep != null && dep is not DataGridRow && dep is not DataGridColumnHeader)
                 dep = VisualTreeHelper.GetParent(dep);
 
             if (dep is DataGridColumnHeader) return;
             if (dep is not DataGridRow row) return;
 
-            // Toggle this row's details
             if (row.DetailsVisibility == Visibility.Visible)
             {
                 row.DetailsVisibility = Visibility.Collapsed;
@@ -95,7 +95,6 @@ namespace MDE_Monitoring_App
             }
             else
             {
-                // (Optional) collapse any other open rows so only one is open
                 foreach (var item in grid.Items)
                 {
                     if (grid.ItemContainerGenerator.ContainerFromItem(item) is DataGridRow r &&
@@ -118,14 +117,12 @@ namespace MDE_Monitoring_App
 
             var dep = (DependencyObject)e.OriginalSource;
 
-            // Walk up to row or header
             while (dep != null && dep is not DataGridRow && dep is not DataGridColumnHeader)
                 dep = VisualTreeHelper.GetParent(dep);
 
             if (dep is DataGridColumnHeader) return;
             if (dep is not DataGridRow row) return;
 
-            // Toggle this row
             if (row.DetailsVisibility == Visibility.Visible)
             {
                 row.DetailsVisibility = Visibility.Collapsed;
@@ -133,7 +130,6 @@ namespace MDE_Monitoring_App
             }
             else
             {
-                // Collapse others (optional: remove loop to allow multiple open)
                 foreach (var item in grid.Items)
                 {
                     if (grid.ItemContainerGenerator.ContainerFromItem(item) is DataGridRow r &&
@@ -167,7 +163,6 @@ namespace MDE_Monitoring_App
             }
             else
             {
-                // Collapse others so only one expanded (remove loop if multi-expand desired)
                 foreach (var item in grid.Items)
                 {
                     if (grid.ItemContainerGenerator.ContainerFromItem(item) is DataGridRow r &&
@@ -183,7 +178,6 @@ namespace MDE_Monitoring_App
             }
         }
 
-        // OPTIONAL: expose usage when run with --help
         protected override void OnContentRendered(EventArgs e)
         {
             base.OnContentRendered(e);
@@ -193,6 +187,42 @@ namespace MDE_Monitoring_App
                 MessageBox.Show(CommandLineOptions.Usage, "Usage",
                     MessageBoxButton.OK, MessageBoxImage.Information);
             }
+        }
+
+        private void FileExit_Click(object sender, RoutedEventArgs e)
+        {
+            Application.Current.Shutdown();
+        }
+
+        // CHANGED: Pass remote context into AdvancedNetworkingWindow so netsh runs remotely
+        private void AdvancedNetworking_Click(object sender, RoutedEventArgs e)
+        {
+            AdvancedNetworkingWindow wnd;
+            if (DataContext is MainViewModel vm)
+            {
+                wnd = new AdvancedNetworkingWindow(vm.TargetMachine, vm.UsePsExec, vm.UsePsExec ? vm.PsExecPath : null)
+                {
+                    Owner = this
+                };
+            }
+            else
+            {
+                wnd = new AdvancedNetworkingWindow { Owner = this };
+            }
+            wnd.ShowDialog();
+        }
+
+        private void HelpUsage_Click(object sender, RoutedEventArgs e)
+        {
+            MessageBox.Show(this, CommandLineOptions.Usage, "Usage", MessageBoxButton.OK, MessageBoxImage.Information);
+        }
+
+        private void HelpAbout_Click(object sender, RoutedEventArgs e)
+        {
+            var asm = Assembly.GetExecutingAssembly().GetName();
+            MessageBoxResult messageBoxResult = MessageBox.Show(this,
+                $"MDE Monitoring App\nVersion: {asm.Version}\nStrong Name Token: {string.Concat(asm.GetPublicKeyToken().Select(b => b.ToString("x2")))}",
+                "About", MessageBoxButton.OK, MessageBoxImage.Information);
         }
     }
 }

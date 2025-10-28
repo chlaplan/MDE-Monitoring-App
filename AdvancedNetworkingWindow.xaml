@@ -1,0 +1,245 @@
+<Window x:Class="MDE_Monitoring_App.AdvancedNetworkingWindow"
+        xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        Title="Advanced Networking Trace"
+        Height="850" Width="900"
+        WindowStartupLocation="CenterOwner"
+        FontFamily="Segoe UI"
+        FontSize="13"
+        Background="#F3F3F3">
+    <Window.Resources>
+        <BooleanToVisibilityConverter x:Key="BoolToVisibilityConverter"/>
+    </Window.Resources>
+
+    <Grid Margin="12">
+        <Grid.RowDefinitions>
+            <RowDefinition Height="Auto"/>
+            <RowDefinition Height="Auto"/>
+            <RowDefinition Height="*"/>
+            <RowDefinition Height="Auto"/>
+        </Grid.RowDefinitions>
+
+        <TextBlock Text="Capture a netsh network trace"
+                   FontSize="18"
+                   FontWeight="Bold"
+                   Foreground="#0078D4"
+                   Margin="0,0,0,10"/>
+
+        <!-- REPLACE the entire StackPanel (Grid.Row="1") block with this Grid for clean alignment -->
+        <Grid Grid.Row="1" Margin="0,0,0,12">
+            <Grid.ColumnDefinitions>
+                <ColumnDefinition Width="100"/>   <!-- Labels -->
+                <ColumnDefinition Width="*"/>     <!-- Content -->
+            </Grid.ColumnDefinitions>
+            <Grid.RowDefinitions>
+                <RowDefinition Height="Auto"/>    <!-- Trace File -->
+                <RowDefinition Height="Auto"/>    <!-- Scenarios -->
+                <RowDefinition Height="Auto"/>    <!-- Scenario Details -->
+                <RowDefinition Height="Auto"/>    <!-- Providers -->
+                <RowDefinition Height="Auto"/>    <!-- Size / Duration / Drop -->
+                <RowDefinition Height="Auto"/>    <!-- Drop Match Criteria -->
+                <RowDefinition Height="Auto"/>    <!-- Capture / Report / Overwrite / Persist -->
+                <RowDefinition Height="Auto"/>    <!-- Start / Stop -->
+            </Grid.RowDefinitions>
+
+            <!-- Trace File -->
+            <TextBlock Grid.Row="0" Grid.Column="0" Text="Trace File:" VerticalAlignment="Center"/>
+            <StackPanel Grid.Row="0" Grid.Column="1" Orientation="Horizontal">
+                <TextBox Width="520"
+                         Text="{Binding TraceFilePath, UpdateSourceTrigger=PropertyChanged}"/>
+                <Button Content="Browse..."
+                        Margin="8,0,0,0"
+                        Padding="10,2"
+                        Click="BrowseTracePath_Click"/>
+            </StackPanel>
+
+            <!-- Scenarios -->
+            <TextBlock Grid.Row="1" Grid.Column="0" Text="Scenarios:" VerticalAlignment="Top" Margin="0,2,0,0"/>
+            <Border Grid.Row="1" Grid.Column="1"
+                    BorderBrush="#C2D5E3"
+                    BorderThickness="1"
+                    Background="White"
+                    Padding="6"
+                    Height="150">
+                <ScrollViewer VerticalScrollBarVisibility="Auto">
+                    <ItemsControl ItemsSource="{Binding ScenarioOptions}">
+                        <ItemsControl.ItemsPanel>
+                            <ItemsPanelTemplate>
+                                <!-- Vertical wrap: fills down then creates next column -->
+                                <WrapPanel Orientation="Vertical"
+                                           Height="140"
+                                           IsItemsHost="True"/>
+                            </ItemsPanelTemplate>
+                        </ItemsControl.ItemsPanel>
+                        <ItemsControl.ItemTemplate>
+                            <DataTemplate>
+                                <CheckBox Content="{Binding Name}"
+                                          IsChecked="{Binding IsSelected, Mode=TwoWay}"
+                                          ToolTip="{Binding Description}"
+                                          Margin="4,2"/>
+                            </DataTemplate>
+                        </ItemsControl.ItemTemplate>
+                    </ItemsControl>
+                </ScrollViewer>
+            </Border>
+
+            <!-- Scenario Details -->
+            <TextBlock Grid.Row="2" Grid.Column="0" Text="Details:" VerticalAlignment="Top" Margin="0,2,0,0"/>
+            <Border Grid.Row="2" Grid.Column="1"
+                    Padding="8"
+                    Background="#FFFFFF"
+                    BorderBrush="#C2D5E3"
+                    BorderThickness="1"
+                    CornerRadius="4">
+                <TextBlock Text="{Binding ScenarioDescription}"
+                           TextWrapping="Wrap"
+                           Foreground="#333"
+                           FontSize="12"/>
+            </Border>
+
+            <!-- Providers -->
+            <TextBlock Grid.Row="3" Grid.Column="0" Text="Providers:" VerticalAlignment="Top" Margin="0,2,0,0"/>
+            <GroupBox Grid.Row="3" Grid.Column="1" Header="Scenario Providers (static)" Margin="0,0,0,4">
+                <DockPanel>
+                    <TextBlock DockPanel.Dock="Top" FontSize="11" Foreground="#444"
+                               Text="Providers are preloaded for each selected scenario (deduplicated by GUID)."/>
+                    <ListView ItemsSource="{Binding Providers}" Height="140" Background="White" SelectionMode="Multiple">
+                        <ListView.View>
+                            <GridView>
+                                <GridViewColumn Header="Select" Width="60">
+                                    <GridViewColumn.CellTemplate>
+                                        <DataTemplate>
+                                            <CheckBox IsChecked="{Binding IsSelected, Mode=TwoWay}"/>
+                                        </DataTemplate>
+                                    </GridViewColumn.CellTemplate>
+                                </GridViewColumn>
+                                <GridViewColumn Header="Name" Width="180" DisplayMemberBinding="{Binding Name}"/>
+                                <GridViewColumn Header="Guid" Width="180" DisplayMemberBinding="{Binding Guid}"/>
+                                <GridViewColumn Header="Level" Width="80" DisplayMemberBinding="{Binding DefaultLevel}"/>
+                                <GridViewColumn Header="Keywords" Width="180" DisplayMemberBinding="{Binding DefaultKeywords}"/>
+                            </GridView>
+                        </ListView.View>
+                    </ListView>
+                </DockPanel>
+            </GroupBox>
+
+            <!-- Size / Duration / Drop -->
+            <TextBlock Grid.Row="4" Grid.Column="0" Text="Options:" VerticalAlignment="Top" Margin="0,4,0,0"/>
+            <StackPanel Grid.Row="4" Grid.Column="1" Orientation="Horizontal" Margin="0,2,0,0">
+                <TextBlock Text="Max Size (MB):" VerticalAlignment="Center" Margin="0,0,6,0"/>
+                <TextBox Width="80" Text="{Binding MaxSizeMb}"/>
+                <TextBlock Text="Duration (s):" VerticalAlignment="Center" Margin="16,0,6,0"/>
+                <TextBox Width="80" Text="{Binding DurationSeconds}"/>
+                <CheckBox Content="Stop after first firewall drop (+10s)"
+                          Margin="16,0,0,0"
+                          IsChecked="{Binding StopAfterFirewallDrop}"/>
+            </StackPanel>
+
+            <!-- Drop Match Criteria -->
+            <TextBlock Grid.Row="5" Grid.Column="0" Text="Drop Match:" VerticalAlignment="Top" Margin="0,4,0,0"/>
+            <GroupBox Grid.Row="5" Grid.Column="1" Header="Optional Drop Match Stop Criteria" Margin="0,4,0,4">
+                <StackPanel>
+                    <CheckBox Content="Enable stop when matched drop detected (+10s)"
+                              IsChecked="{Binding StopAfterFilteredDrop}"
+                              Margin="0,0,0,6"/>
+                    <UniformGrid Columns="4" Rows="1" Margin="0,0,0,4">
+                        <StackPanel Orientation="Horizontal" Margin="0,0,8,4">
+                            <TextBlock Text="Source IP:" Width="70" VerticalAlignment="Center"/>
+                            <TextBox Width="120" Text="{Binding MatchSourceIp, UpdateSourceTrigger=PropertyChanged}"/>
+                        </StackPanel>
+                        <StackPanel Orientation="Horizontal" Margin="0,0,8,4">
+                            <TextBlock Text="Dest IP:" Width="55" VerticalAlignment="Center"/>
+                            <TextBox Width="128" Text="{Binding MatchDestIp, UpdateSourceTrigger=PropertyChanged}"/>
+                        </StackPanel>
+                        <StackPanel Orientation="Horizontal" Margin="0,0,8,4">
+                            <TextBlock Text="Source Port:" Width="80" VerticalAlignment="Center"/>
+                            <TextBox Width="70" Text="{Binding MatchSourcePort, UpdateSourceTrigger=PropertyChanged}"/>
+                        </StackPanel>
+                        <StackPanel Orientation="Horizontal" Margin="0,0,8,4">
+                            <TextBlock Text="Dest Port:" Width="70" VerticalAlignment="Center"/>
+                            <TextBox Width="70" Text="{Binding MatchDestPort, UpdateSourceTrigger=PropertyChanged}"/>
+                        </StackPanel>
+                    </UniformGrid>
+                    <TextBlock Text="Leave fields blank to ignore that criterion. All specified criteria must match a dropped packet to trigger stop."
+                               FontSize="11"
+                               Foreground="#444"
+                               TextWrapping="Wrap"/>
+                </StackPanel>
+            </GroupBox>
+
+            <!-- Capture / Report / Overwrite / Persist -->
+            <TextBlock Grid.Row="6" Grid.Column="0" Text="Flags:" VerticalAlignment="Top" Margin="0,4,0,0"/>
+            <StackPanel Grid.Row="6" Grid.Column="1" Orientation="Horizontal" Margin="0,2,0,0">
+                <CheckBox Content="Capture yes" IsChecked="{Binding CaptureYes}"/>
+                <CheckBox Content="Report yes" Margin="16,0,0,0" IsChecked="{Binding ReportYes}"/>
+                <CheckBox Content="Overwrite existing" Margin="16,0,0,0" IsChecked="{Binding Overwrite}"/>
+                <CheckBox Content="Persist (survives reboot)" Margin="16,0,0,0" IsChecked="{Binding Persistent}"/>
+            </StackPanel>
+
+            <!-- Start / Stop -->
+            <TextBlock Grid.Row="7" Grid.Column="0" Text="Control:" VerticalAlignment="Top" Margin="0,4,0,0"/>
+            <StackPanel Grid.Row="7" Grid.Column="1" Orientation="Horizontal" Margin="0,2,0,0">
+                <Button Content="Start Trace"
+                        Width="140"
+                        Padding="10,4"
+                        Background="#0078D4"
+                        Foreground="White"
+                        IsEnabled="{Binding CanStart}"
+                        Click="StartTrace_Click"
+                        ToolTip="Start netsh trace (requires elevation)"/>
+                <Grid Width="28" Height="28" Margin="10,0,0,0"
+                      Visibility="{Binding IsTracing, Converter={StaticResource BoolToVisibilityConverter}}">
+                    <Canvas Width="28" Height="28">
+                        <Ellipse Width="5" Height="5" Fill="#0078D4" Canvas.Left="22" Canvas.Top="13" Opacity="1"/>
+                        <Ellipse Width="5" Height="5" Fill="#0078D4" Canvas.Left="21" Canvas.Top="19" Opacity="0.85"/>
+                        <Ellipse Width="5" Height="5" Fill="#0078D4" Canvas.Left="14" Canvas.Top="22" Opacity="0.7"/>
+                        <Ellipse Width="5" Height="5" Fill="#0078D4" Canvas.Left="7"  Canvas.Top="19" Opacity="0.55"/>
+                        <Ellipse Width="5" Height="5" Fill="#0078D4" Canvas.Left="6"  Canvas.Top="13" Opacity="0.4"/>
+                        <Ellipse Width="5" Height="5" Fill="#0078D4" Canvas.Left="7"  Canvas.Top="7"  Opacity="0.55"/>
+                        <Ellipse Width="5" Height="5" Fill="#0078D4" Canvas.Left="14" Canvas.Top="4"  Opacity="0.7"/>
+                        <Ellipse Width="5" Height="5" Fill="#0078D4" Canvas.Left="21" Canvas.Top="7"  Opacity="0.85"/>
+                        <Canvas.RenderTransform>
+                            <RotateTransform Angle="0" CenterX="14" CenterY="14"/>
+                        </Canvas.RenderTransform>
+                        <Canvas.Triggers>
+                            <EventTrigger RoutedEvent="Canvas.Loaded">
+                                <BeginStoryboard>
+                                    <Storyboard RepeatBehavior="Forever">
+                                        <DoubleAnimation Storyboard.TargetProperty="(UIElement.RenderTransform).(RotateTransform.Angle)"
+                                                         From="0" To="360" Duration="0:0:1.0"/>
+                                    </Storyboard>
+                                </BeginStoryboard>
+                            </EventTrigger>
+                        </Canvas.Triggers>
+                    </Canvas>
+                </Grid>
+                <Button Content="Stop Trace"
+                        Width="140"
+                        Margin="10,0,0,0"
+                        Padding="10,4"
+                        Background="#C42B1C"
+                        Foreground="White"
+                        IsEnabled="{Binding IsTracing}"
+                        Click="StopTrace_Click"
+                        ToolTip="Stop current trace"/>
+            </StackPanel>
+        </Grid>
+
+        <GroupBox Grid.Row="2" Header="Status / Output">
+            <TextBox Text="{Binding StatusLog}"
+                     FontFamily="Consolas"
+                     FontSize="12"
+                     IsReadOnly="True"
+                     VerticalScrollBarVisibility="Auto"
+                     TextWrapping="Wrap"
+                     Background="White"/>
+        </GroupBox>
+
+        <StackPanel Grid.Row="3" Orientation="Horizontal" HorizontalAlignment="Right">
+            <Button Content="Close"
+                    Width="110"
+                    Padding="10,4"
+                    Click="Close_Click"/>
+        </StackPanel>
+    </Grid>
+</Window>
