@@ -991,6 +991,8 @@ namespace MDE_Monitoring_App
 
         public string CompliancePolicyName => _compliancePolicy?.Name ?? "(none)";
         public string CompliancePolicyDescription => _compliancePolicy?.Description ?? "No compliance policy loaded.";
+        // ADD: Combined header for UI
+        public string CompliancePolicyHeader => $"{CompliancePolicyName} - {CompliancePolicyDescription}";
 
         public void LoadCompliancePolicy()
         {
@@ -1002,6 +1004,7 @@ namespace MDE_Monitoring_App
                     _compliancePolicy = null;
                     OnPropertyChanged(nameof(CompliancePolicyName));
                     OnPropertyChanged(nameof(CompliancePolicyDescription));
+                    OnPropertyChanged(nameof(CompliancePolicyHeader)); // ADD
                     ComplianceItems.Clear();
                     CompliancePercentage = 0;
                     return;
@@ -1010,6 +1013,7 @@ namespace MDE_Monitoring_App
                 _compliancePolicy = JsonSerializer.Deserialize<CompliancePolicy>(json);
                 OnPropertyChanged(nameof(CompliancePolicyName));
                 OnPropertyChanged(nameof(CompliancePolicyDescription));
+                OnPropertyChanged(nameof(CompliancePolicyHeader)); // ADD
             }
             catch (Exception ex)
             {
@@ -1022,6 +1026,7 @@ namespace MDE_Monitoring_App
                 _compliancePolicy = null;
                 OnPropertyChanged(nameof(CompliancePolicyName));
                 OnPropertyChanged(nameof(CompliancePolicyDescription));
+                OnPropertyChanged(nameof(CompliancePolicyHeader)); // ADD
             }
             EvaluateCompliance();
         }

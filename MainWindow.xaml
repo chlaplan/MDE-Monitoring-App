@@ -813,33 +813,46 @@
                     <!-- Header / Pie -->
                     <DockPanel Grid.Row="0" Margin="0,0,0,10">
                         <StackPanel Orientation="Horizontal" DockPanel.Dock="Left" VerticalAlignment="Center">
-                            <TextBlock Text="Compliance Overview"
-                                       FontSize="18"
-                                       FontWeight="Bold"
-                                       Foreground="#0078D4"
-                                       Margin="0,0,16,0"
-                                       VerticalAlignment="Center"/>
+                            <StackPanel Margin="0,0,18,0">
+                                <TextBlock Text="Compliance Overview"
+                                           FontSize="18"
+                                           FontWeight="Bold"
+                                           Foreground="#0078D4"/>
+                                <!-- NEW: Prominent current policy name -->
+                                <TextBlock Text="{Binding CompliancePolicyName}"
+                                           Margin="0,4,0,0"
+                                           FontSize="16"
+                                           FontWeight="SemiBold"
+                                           Foreground="#004578"
+                                           ToolTip="Current compliance policy name"/>
+                            </StackPanel>
+
                             <controls:CompliancePieChart Percentage="{Binding CompliancePercentage}"
                                                          Width="130" Height="130"
                                                          ToolTip="{Binding ComplianceSummaryDisplay}"/>
-                            <StackPanel Margin="20,0,0,0" VerticalAlignment="Center">
-                                <TextBlock Text="{Binding LoadedCompliancePolicyName, StringFormat=Policy: {0}}"
-                                           FontWeight="SemiBold"/>
-                                <TextBlock Text="{Binding LoadedCompliancePolicyDescription}"
+
+                            <StackPanel Margin="20,0,0,0" VerticalAlignment="Center" Width="320">
+                                <!-- UPDATED: Use existing properties from MainViewModel -->
+                                <TextBlock Text="{Binding CompliancePolicyDescription}"
                                            TextWrapping="Wrap"
-                                           Width="300"
                                            Foreground="Gray"
-                                           FontSize="12"
-                                           Margin="0,4,0,0"/>
+                                           FontSize="12"/>
                                 <TextBlock Text="{Binding ComplianceSummaryDisplay}"
                                            FontWeight="Bold"
                                            Margin="0,8,0,0"
                                            Foreground="#1E7D24"/>
-                                <Button Content="Reload Policy"
-                                        Width="120"
-                                        Margin="0,8,0,0"
-                                        Padding="6,2"
-                                        Click="ReloadCompliancePolicy_Click"/>
+                                <StackPanel Orientation="Horizontal" Margin="0,8,0,0">
+                                    <Button Content="Reload Policy"
+                                            Width="120"
+                                            Padding="6,2"
+                                            Click="ReloadCompliancePolicy_Click"
+                                            ToolTip="Reload CompliancePolicy.config.json"/>
+                                    <!-- OPTIONAL: Show file name if not (none) -->
+                                    <TextBlock Margin="12,4,0,0"
+                                               Foreground="Gray"
+                                               FontSize="11"
+                                               Text="{Binding CompliancePolicyName, StringFormat=Policy: {0}}"/>
+                                </StackPanel>
                             </StackPanel>
                         </StackPanel>
                     </DockPanel>
@@ -856,11 +869,11 @@
                               ScrollViewer.VerticalScrollBarVisibility="Auto"
                               ScrollViewer.HorizontalScrollBarVisibility="Auto">
                         <DataGrid.Columns>
-                            <DataGridTextColumn Header="Setting" Binding="{Binding Name}" Width="220"/>
-                            <DataGridTextColumn Header="Required" Binding="{Binding RequiredDisplay}" Width="110"/>
-                            <DataGridTextColumn Header="Current" Binding="{Binding CurrentDisplay}" Width="120"/>
+                            <DataGridTextColumn Header="Setting"   Binding="{Binding Name}"            Width="220"/>
+                            <DataGridTextColumn Header="Required"  Binding="{Binding RequiredDisplay}" Width="110"/>
+                            <DataGridTextColumn Header="Current"   Binding="{Binding CurrentDisplay}"  Width="120"/>
                             <DataGridTextColumn Header="Compliant" Binding="{Binding CompliantDisplay}" Width="90"/>
-                            <DataGridTextColumn Header="Notes" Binding="{Binding Notes}" Width="*">
+                            <DataGridTextColumn Header="Notes"     Binding="{Binding Notes}"          Width="*">
                                 <DataGridTextColumn.ElementStyle>
                                     <Style TargetType="TextBlock">
                                         <Setter Property="TextWrapping" Value="Wrap"/>
