@@ -11,6 +11,7 @@ using MDE_Monitoring_App.Services;
 using System.IO;
 using System.Threading;
 using System.Text;
+using System.Text.Json; // ADD
 
 namespace MDE_Monitoring_App
 {
@@ -223,6 +224,8 @@ namespace MDE_Monitoring_App
             UsePsExec = false;                // default to WinRM
             PsExecPath = @"C:\Sysinternals\PsExec.exe";
 
+            LoadCompliancePolicy(); // LOAD POLICY EARLY
+
             _ = RefreshDataAsync();
         }
 
@@ -351,11 +354,11 @@ namespace MDE_Monitoring_App
         public string SecurityServicesConfiguredDisplay => "Configured Services: " + DeviceGuardStatus.SecurityServicesConfiguredDisplay;
         public string SecurityServicesRunningDisplay => "Running Services: " + DeviceGuardStatus.SecurityServicesRunningDisplay;
         public string AvailableSecurityPropertiesDisplay => "Available: " + DeviceGuardStatus.AvailableSecurityPropertiesDisplay;
-        public string RequiredSecurityPropertiesDisplay  => "Required: " + DeviceGuardStatus.RequiredSecurityPropertiesDisplay;
-        public string SecurityFeaturesEnabledDisplay     => "Features Enabled: " + DeviceGuardStatus.SecurityFeaturesEnabledDisplay;
+        public string RequiredSecurityPropertiesDisplay => "Required: " + DeviceGuardStatus.RequiredSecurityPropertiesDisplay;
+        public string SecurityFeaturesEnabledDisplay => "Features Enabled: " + DeviceGuardStatus.SecurityFeaturesEnabledDisplay;
         public string UsermodeCodeIntegrityPolicyDisplay => "User-mode CI: " + DeviceGuardStatus.UsermodeCodeIntegrityPolicyDisplay;
-        public string InstanceIdentifierDisplay          => "Instance ID: " + DeviceGuardStatus.InstanceIdentifierDisplay;
-        public string VersionDisplay                     => "Schema Version: " + DeviceGuardStatus.VersionDisplay;
+        public string InstanceIdentifierDisplay => "Instance ID: " + DeviceGuardStatus.InstanceIdentifierDisplay;
+        public string VersionDisplay => "Schema Version: " + DeviceGuardStatus.VersionDisplay;
 
         private async Task<DeviceGuardStatus> LoadDeviceGuardStatusAsync()
         {
@@ -530,24 +533,24 @@ namespace MDE_Monitoring_App
                 using var refreshCts = new CancellationTokenSource(TimeSpan.FromSeconds(30));
                 var remoteOpts = BuildRemoteOptions();
 
-                var dcTask              = Task.Run(() => DeviceControlService.LoadLatestDeviceControlEvents(IsRemote ? TargetMachine : null, 500, refreshCts.Token), refreshCts.Token);
-                var logsTask            = Task.Run(() => _logCollector.GetDefenderLogs(IsRemote ? TargetMachine : null, remoteOpts, refreshCts.Token), refreshCts.Token);
-                var statusTask          = Task.Run(() => _defenderStatusService.GetStatus(IsRemote ? TargetMachine : null, remoteOpts?.LongTimeout ?? TimeSpan.FromSeconds(5)), refreshCts.Token);
-                var firewallTask        = Task.Run(() => _firewallLogService.LoadRecentDrops(200, IsRemote ? TargetMachine : null, refreshCts.Token), refreshCts.Token);
+                var dcTask = Task.Run(() => DeviceControlService.LoadLatestDeviceControlEvents(IsRemote ? TargetMachine : null, 500, refreshCts.Token), refreshCts.Token);
+                var logsTask = Task.Run(() => _logCollector.GetDefenderLogs(IsRemote ? TargetMachine : null, remoteOpts, refreshCts.Token), refreshCts.Token);
+                var statusTask = Task.Run(() => _defenderStatusService.GetStatus(IsRemote ? TargetMachine : null, remoteOpts?.LongTimeout ?? TimeSpan.FromSeconds(5)), refreshCts.Token);
+                var firewallTask = Task.Run(() => _firewallLogService.LoadRecentDrops(200, IsRemote ? TargetMachine : null, refreshCts.Token), refreshCts.Token);
                 _wfpFilterService.UsePsExecFallback = UsePsExec;
                 _wfpFilterService.PsExecCustomPath = string.IsNullOrWhiteSpace(PsExecPath) ? null : PsExecPath;
-                var wfpTask             = _wfpFilterService.GetFilterSummarySafeAsync(
+                var wfpTask = _wfpFilterService.GetFilterSummarySafeAsync(
                     IsRemote ? TargetMachine : null,
                     includeRuleCounts: true,
                     ct: refreshCts.Token,
                     timeout: remoteOpts?.LongTimeout ?? TimeSpan.FromSeconds(25));
                 _policyService.UsePsExec = UsePsExec;
                 _policyService.PsExecCustomPath = string.IsNullOrWhiteSpace(PsExecPath) ? null : PsExecPath;
-                var policyTask          = Task.Run(() => _policyService.LoadPolicies(IsRemote ? TargetMachine : null), refreshCts.Token);
-                var latestTask          = _latestVersionService.GetLatestAsync();
-                var intuneSyncTask      = Task.Run(_intuneSyncService.GetLastSync, refreshCts.Token);
-                var appControlStatusTask= Task.Run(_appControlStatusService.GetStatus, refreshCts.Token);
-                var appControlLogsTask  = Task.Run(() => _appControlLogService.GetRecent(IsRemote ? TargetMachine : null, 150, refreshCts.Token, remoteOpts?.ShortTimeout ?? TimeSpan.FromSeconds(8), remoteOpts), refreshCts.Token);
+                var policyTask = Task.Run(() => _policyService.LoadPolicies(IsRemote ? TargetMachine : null), refreshCts.Token);
+                var latestTask = _latestVersionService.GetLatestAsync();
+                var intuneSyncTask = Task.Run(_intuneSyncService.GetLastSync, refreshCts.Token);
+                var appControlStatusTask = Task.Run(_appControlStatusService.GetStatus, refreshCts.Token);
+                var appControlLogsTask = Task.Run(() => _appControlLogService.GetRecent(IsRemote ? TargetMachine : null, 150, refreshCts.Token, remoteOpts?.ShortTimeout ?? TimeSpan.FromSeconds(8), remoteOpts), refreshCts.Token);
                 _deviceGuardStatusService.UsePsExecFallback = UsePsExec;
                 _deviceGuardStatusService.PsExecCustomPath = string.IsNullOrWhiteSpace(PsExecPath) ? null : PsExecPath;
                 var dgTask = _deviceGuardStatusService.GetStatusAsync(
@@ -555,7 +558,7 @@ namespace MDE_Monitoring_App
                     TimeSpan.FromSeconds(20),
                     refreshCts.Token);
                 DeviceControlPolicyStatus = "Loading...";
-                var dcPoliciesTask      = _deviceControlPolicyService.GetSnapshotAsync(
+                var dcPoliciesTask = _deviceControlPolicyService.GetSnapshotAsync(
                     fallbackGroupsFile: "SamplePolicies/PolicyGroups.txt",
                     fallbackRulesFile: "SamplePolicies/PolicyRules.txt",
                     ct: refreshCts.Token,
@@ -564,20 +567,20 @@ namespace MDE_Monitoring_App
                 var enrollmentTask = Task.Run(() => _intuneEnrollmentService.Get(IsRemote ? TargetMachine : null), refreshCts.Token);
 
                 // Await
-                var dcEvents         = await dcTask.ConfigureAwait(false);
-                var newLogs          = await logsTask.ConfigureAwait(false);
-                var newStatus        = await statusTask.ConfigureAwait(false);
-                var fwEvents         = await firewallTask.ConfigureAwait(false);
-                var wfpSummary       = await wfpTask.ConfigureAwait(false);
-                var policies         = await policyTask.ConfigureAwait(false);
-                var latest           = await latestTask.ConfigureAwait(false);
-                var intuneLastSync   = await intuneSyncTask.ConfigureAwait(false);
+                var dcEvents = await dcTask.ConfigureAwait(false);
+                var newLogs = await logsTask.ConfigureAwait(false);
+                var newStatus = await statusTask.ConfigureAwait(false);
+                var fwEvents = await firewallTask.ConfigureAwait(false);
+                var wfpSummary = await wfpTask.ConfigureAwait(false);
+                var policies = await policyTask.ConfigureAwait(false);
+                var latest = await latestTask.ConfigureAwait(false);
+                var intuneLastSync = await intuneSyncTask.ConfigureAwait(false);
                 var appControlStatus = await appControlStatusTask.ConfigureAwait(false);
-                var appControlLogs   = await appControlLogsTask.ConfigureAwait(false);
+                var appControlLogs = await appControlLogsTask.ConfigureAwait(false);
                 var deviceGuardStatus = await dgTask.ConfigureAwait(false);
                 var dcPoliciesSnapshot = await dcPoliciesTask.ConfigureAwait(false);
-                var fwProfiles       = await fwStatusTask.ConfigureAwait(false);
-                var enrollmentInfo   = await enrollmentTask.ConfigureAwait(false);
+                var fwProfiles = await fwStatusTask.ConfigureAwait(false);
+                var enrollmentInfo = await enrollmentTask.ConfigureAwait(false);
 
                 if (IsRemote)
                 {
@@ -615,15 +618,15 @@ namespace MDE_Monitoring_App
                     foreach (var p in policies) DefenderPolicies.Add(p);
                     PolicyView.Refresh();
 
-                    DefenderStatus.AMProductVersion               = newStatus.AMProductVersion;
-                    DefenderStatus.AMEngineVersion                = newStatus.AMEngineVersion;
-                    DefenderStatus.AMRunningMode                  = newStatus.AMRunningMode;
-                    DefenderStatus.RealTimeProtection             = newStatus.RealTimeProtection;
-                    DefenderStatus.AntivirusSignatureAge          = newStatus.AntivirusSignatureAge;
-                    DefenderStatus.AntispywareSignatureAge        = newStatus.AntispywareSignatureAge;
-                    DefenderStatus.DeviceControlDefaultEnforcement= newStatus.DeviceControlDefaultEnforcement;
-                    DefenderStatus.DeviceControlState             = newStatus.DeviceControlState;
-                    DefenderStatus.IsTamperProtected              = newStatus.IsTamperProtected;
+                    DefenderStatus.AMProductVersion = newStatus.AMProductVersion;
+                    DefenderStatus.AMEngineVersion = newStatus.AMEngineVersion;
+                    DefenderStatus.AMRunningMode = newStatus.AMRunningMode;
+                    DefenderStatus.RealTimeProtection = newStatus.RealTimeProtection;
+                    DefenderStatus.AntivirusSignatureAge = newStatus.AntivirusSignatureAge;
+                    DefenderStatus.AntispywareSignatureAge = newStatus.AntispywareSignatureAge;
+                    DefenderStatus.DeviceControlDefaultEnforcement = newStatus.DeviceControlDefaultEnforcement;
+                    DefenderStatus.DeviceControlState = newStatus.DeviceControlState;
+                    DefenderStatus.IsTamperProtected = newStatus.IsTamperProtected;
 
                     if (IsRemote)
                     {
@@ -651,10 +654,10 @@ namespace MDE_Monitoring_App
                         CurrentSystem.JoinType = GetAADJoinType();
                     }
 
-                    LatestVersions   = latest.versions;
+                    LatestVersions = latest.versions;
                     LatestFetchState = latest.state;
                     LatestFetchError = latest.error;
-                    IntuneLastSyncUtc= intuneLastSync;
+                    IntuneLastSyncUtc = intuneLastSync;
                     _intuneEnrollmentInfo = enrollmentInfo;
                     OnPropertyChanged(nameof(IntuneEnrollmentStatus));
                     OnPropertyChanged(nameof(IntuneEnrollmentEffectiveType));
@@ -696,7 +699,7 @@ namespace MDE_Monitoring_App
                     if (dcPoliciesSnapshot != null)
                     {
                         DeviceControlPolicyGroups = new ObservableCollection<DeviceControlPolicyGroup>(dcPoliciesSnapshot.Groups);
-                        DeviceControlPolicyRules  = new ObservableCollection<DeviceControlPolicyRule>(dcPoliciesSnapshot.Rules);
+                        DeviceControlPolicyRules = new ObservableCollection<DeviceControlPolicyRule>(dcPoliciesSnapshot.Rules);
                         OnPropertyChanged(nameof(DeviceControlPolicyGroups));
                         OnPropertyChanged(nameof(DeviceControlPolicyRules));
                         DeviceControlPolicyStatus = $"Groups: {dcPoliciesSnapshot.Groups.Count} | Rules: {dcPoliciesSnapshot.Rules.Count}";
@@ -709,6 +712,8 @@ namespace MDE_Monitoring_App
 
                     LastRefreshed = DateTime.Now;
                     LogsView.Refresh();
+
+                    EvaluateCompliance();
                 });
             }
             catch (Exception ex)
@@ -951,5 +956,228 @@ namespace MDE_Monitoring_App
         // Updated combined display to use derived values
         public string IntuneEnrollmentDisplay =>
             $"{IntuneEnrollmentEffectiveType} | {IntuneEnrollmentOrigin} | UPN: {IntuneEnrollmentUpn} | State: {IntuneEnrollmentState}";
+
+        // --- Compliance additions ---
+        private CompliancePolicy? _compliancePolicy;
+        public ObservableCollection<ComplianceItem> ComplianceItems { get; } = new();
+
+        private double _compliancePercentage;
+        public double CompliancePercentage
+        {
+            get => _compliancePercentage;
+            private set
+            {
+                if (Math.Abs(_compliancePercentage - value) > 0.0001)
+                {
+                    _compliancePercentage = value;
+                    OnPropertyChanged();
+                    OnPropertyChanged(nameof(ComplianceSummaryDisplay));
+                }
+            }
+        }
+
+        public string ComplianceSummaryDisplay =>
+            ComplianceItems.Count == 0
+                ? "No compliance items"
+                : $"{CompliancePercentage:0}% compliant ({ComplianceItems.Count(c => c.Compliant)}/{ComplianceItems.Count})";
+
+        public string CompliancePolicyName => _compliancePolicy?.Name ?? "(none)";
+        public string CompliancePolicyDescription => _compliancePolicy?.Description ?? "No compliance policy loaded.";
+
+        public void LoadCompliancePolicy()
+        {
+            try
+            {
+                var path = Path.Combine(AppContext.BaseDirectory, "CompliancePolicy.config.json");
+                if (!File.Exists(path))
+                {
+                    _compliancePolicy = null;
+                    OnPropertyChanged(nameof(CompliancePolicyName));
+                    OnPropertyChanged(nameof(CompliancePolicyDescription));
+                    ComplianceItems.Clear();
+                    CompliancePercentage = 0;
+                    return;
+                }
+                var json = File.ReadAllText(path);
+                _compliancePolicy = JsonSerializer.Deserialize<CompliancePolicy>(json);
+                OnPropertyChanged(nameof(CompliancePolicyName));
+                OnPropertyChanged(nameof(CompliancePolicyDescription));
+            }
+            catch (Exception ex)
+            {
+                Logs.Insert(0, new LogEntry
+                {
+                    Time = DateTime.Now,
+                    Level = "Error",
+                    Message = "Failed to load compliance policy: " + ex.Message
+                });
+                _compliancePolicy = null;
+                OnPropertyChanged(nameof(CompliancePolicyName));
+                OnPropertyChanged(nameof(CompliancePolicyDescription));
+            }
+            EvaluateCompliance();
+        }
+
+        public void EvaluateCompliance()
+        {
+            ComplianceItems.Clear();
+            if (_compliancePolicy == null)
+            {
+                CompliancePercentage = 0;
+                OnPropertyChanged(nameof(ComplianceSummaryDisplay));
+                return;
+            }
+
+            bool IsOn(string? s) =>
+                !string.IsNullOrWhiteSpace(s) &&
+                s.Trim().Equals("On", StringComparison.OrdinalIgnoreCase);
+
+            var policy = _compliancePolicy;
+
+            // Always list each supported setting. If requirement flag is false -> "Not configured".
+            AddBool("Real-Time Protection", policy.RequireRealTimeProtection, IsOn(DefenderStatus.RealTimeProtection), "Core malware monitoring.");
+            AddBool("Tamper Protection", policy.RequireTamperProtection, DefenderStatus.IsTamperProtected == true, "Protects Defender settings.");
+            AddBool("Firewall Enabled", policy.RequireFirewall, FirewallProfileStatusesDisplay.Any(p => p.Enabled), "At least one enabled profile.");
+            AddBool("Device Control Enabled", policy.RequireDeviceControlEnabled,
+                !string.IsNullOrWhiteSpace(DefenderStatus.DeviceControlState) &&
+                !DefenderStatus.DeviceControlState.Contains("Disabled", StringComparison.OrdinalIgnoreCase),
+                "Device Control active.");
+
+            // These policy flags exist but current status properties are NOT in DefenderStatus.
+            // They are added with CurrentDisplay = 'Unknown' until underlying status values are provided.
+            AddBool("Cloud Protection", policy.RequireCloudProtection, false, "Status source not implemented (set to Unknown).");
+            AddBool("Sample Submission", policy.RequireSampleSubmission, false, "Status source not implemented (set to Unknown).");
+            AddBool("IOAV Protection", policy.RequireIoavProtection, false, "Status source not implemented (set to Unknown).");
+            AddBool("On-Access Protection", policy.RequireOnAccessProtection, false, "Status source not implemented (set to Unknown).");
+            AddBool("Antivirus Enabled", policy.RequireAntivirusEnabled, IsOn(DefenderStatus.RealTimeProtection), "Using Real-Time Protection as proxy.");
+            AddBool("Smart App Control", policy.RequireSmartAppControlOn, false, "Status source not implemented (set to Unknown).");
+
+            int? ParseHours(string? v)
+            {
+                if (string.IsNullOrWhiteSpace(v)) return null;
+                var digits = new string(v.Where(char.IsDigit).ToArray());
+                if (int.TryParse(digits, out var h)) return h;
+                return null;
+            }
+
+            if (policy.RequireSignaturesUpToDate)
+            {
+                AddAge("AV Signatures Age (hrs)", policy.MaxAntivirusSignatureAgeHours, ParseHours(DefenderStatus.AntivirusSignatureAge), "Antivirus signature freshness.");
+                AddAge("ASW Signatures Age (hrs)", policy.MaxAntispywareSignatureAgeHours, ParseHours(DefenderStatus.AntispywareSignatureAge), "Antispyware signature freshness.");
+            }
+            else
+            {
+                AddAge("AV Signatures Age (hrs)", 0, ParseHours(DefenderStatus.AntivirusSignatureAge), "Not configured.");
+                AddAge("ASW Signatures Age (hrs)", 0, ParseHours(DefenderStatus.AntispywareSignatureAge), "Not configured.");
+            }
+
+            AddAge("Full Scan Age (days)", policy.MaxFullScanAgeDays, null, "Scan timestamp not available.");
+            AddAge("Quick Scan Age (days)", policy.MaxQuickScanAgeDays, null, "Scan timestamp not available.");
+
+            if (policy.DeviceControlGroupIds is { Count: > 0 })
+            {
+                var missing = policy.DeviceControlGroupIds.Where(id =>
+                    DeviceControlPolicyGroups == null ||
+                    !DeviceControlPolicyGroups.Any(g => string.Equals(g.Id, id, StringComparison.OrdinalIgnoreCase))).ToList();
+                ComplianceItems.Add(new ComplianceItem
+                {
+                    Name = "Device Control Group IDs",
+                    RequiredDisplay = string.Join(", ", policy.DeviceControlGroupIds),
+                    CurrentDisplay = DeviceControlPolicyGroups == null ? "(none)" :
+                        string.Join(", ", DeviceControlPolicyGroups.Select(g => g.Id)),
+                    Compliant = missing.Count == 0,
+                    CompliantDisplay = missing.Count == 0 ? "Yes" : "No",
+                    Notes = missing.Count == 0 ? "All present" : "Missing: " + string.Join(", ", missing)
+                });
+            }
+            else
+            {
+                ComplianceItems.Add(new ComplianceItem
+                {
+                    Name = "Device Control Group IDs",
+                    RequiredDisplay = "Not configured",
+                    CurrentDisplay = DeviceControlPolicyGroups == null ? "(none)" :
+                        string.Join(", ", DeviceControlPolicyGroups.Select(g => g.Id)),
+                    Compliant = true,
+                    CompliantDisplay = "N/A",
+                    Notes = "No required group IDs."
+                });
+            }
+
+            if (policy.DeviceControlRuleIds is { Count: > 0 })
+            {
+                var missing = policy.DeviceControlRuleIds.Where(id =>
+                    DeviceControlPolicyRules == null ||
+                    !DeviceControlPolicyRules.Any(r => string.Equals(r.Id, id, StringComparison.OrdinalIgnoreCase))).ToList();
+                ComplianceItems.Add(new ComplianceItem
+                {
+                    Name = "Device Control Rule IDs",
+                    RequiredDisplay = string.Join(", ", policy.DeviceControlRuleIds),
+                    CurrentDisplay = DeviceControlPolicyRules == null ? "(none)" :
+                        string.Join(", ", DeviceControlPolicyRules.Select(r => r.Id)),
+                    Compliant = missing.Count == 0,
+                    CompliantDisplay = missing.Count == 0 ? "Yes" : "No",
+                    Notes = missing.Count == 0 ? "All present" : "Missing: " + string.Join(", ", missing)
+                });
+            }
+            else
+            {
+                ComplianceItems.Add(new ComplianceItem
+                {
+                    Name = "Device Control Rule IDs",
+                    RequiredDisplay = "Not configured",
+                    CurrentDisplay = DeviceControlPolicyRules == null ? "(none)" :
+                        string.Join(", ", DeviceControlPolicyRules.Select(r => r.Id)),
+                    Compliant = true,
+                    CompliantDisplay = "N/A",
+                    Notes = "No required rule IDs."
+                });
+            }
+
+            // Percentage: only count items truly required (RequiredDisplay != Not configured)
+            var evaluable = ComplianceItems.Where(ci => !string.Equals(ci.RequiredDisplay, "Not configured", StringComparison.OrdinalIgnoreCase)).ToList();
+            var passed = evaluable.Count(ci => ci.Compliant);
+            CompliancePercentage = evaluable.Count == 0 ? 100 : (double)passed / evaluable.Count * 100.0;
+            OnPropertyChanged(nameof(ComplianceSummaryDisplay));
+
+            void AddBool(string name, bool requiredFlag, bool current, string notes)
+            {
+                ComplianceItems.Add(new ComplianceItem
+                {
+                    Name = name,
+                    RequiredDisplay = requiredFlag ? "Required" : "Not configured",
+                    CurrentDisplay = current ? "On" : (current ? "On" : "Off/Unknown"),
+                    Compliant = requiredFlag ? current : true,
+                    CompliantDisplay = requiredFlag ? (current ? "Yes" : "No") : "N/A",
+                    Notes = notes
+                });
+            }
+
+            void AddAge(string name, int maxAllowed, int? current, string notes)
+            {
+                bool required = maxAllowed > 0;
+                bool ok = !required || (current.HasValue && current.Value <= maxAllowed);
+                ComplianceItems.Add(new ComplianceItem
+                {
+                    Name = name,
+                    RequiredDisplay = required ? ("<=" + maxAllowed) : "Not configured",
+                    CurrentDisplay = current.HasValue ? current.Value.ToString() : "Unknown",
+                    Compliant = ok,
+                    CompliantDisplay = required ? (ok ? "Yes" : "No") : "N/A",
+                    Notes = notes
+                });
+            }
+        }
+
+        // --- Compliance item model (add at end of file, inside namespace but outside MainViewModel) ---
+        public sealed class ComplianceItem
+        {
+            public string Name { get; set; } = "";
+            public string RequiredDisplay { get; set; } = "";
+            public string CurrentDisplay { get; set; } = "";
+            public bool Compliant { get; set; }
+            public string CompliantDisplay { get; set; } = "";
+            public string Notes { get; set; } = "";
+        }
     }
 }

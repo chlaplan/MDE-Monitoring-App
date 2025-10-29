@@ -235,5 +235,14 @@ namespace MDE_Monitoring_App
             };
             win.ShowDialog();
         }
+
+        // ADD handler for reload button
+        private void ReloadCompliancePolicy_Click(object sender, RoutedEventArgs e)
+        {
+            if (DataContext is MainViewModel vm)
+            {
+                vm.LoadCompliancePolicy();
+            }
+        }
     }
 }
