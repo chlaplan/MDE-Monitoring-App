@@ -14,6 +14,10 @@ namespace MDE_Monitoring_App.Services
         private const string SigKey      = RootKey + @"\Signature Updates";
         private const string EngineKey   = RootKey + @"\Engine";
         private const string FeaturesKey = RootKey + @"\Features"; 
+        private const string WDBase = @"SOFTWARE\Microsoft\Windows Defender";
+        private const string WDSpynet = WDBase + @"\Spynet";
+        private const string WDRealTime = WDBase + @"\Real-Time Protection";
+        private const string CI_SAC_Key = @"SYSTEM\CurrentControlSet\Control\CI\Policy";
 
         // Public entry points
         public DefenderStatus GetStatus() => GetStatus(null, TimeSpan.FromSeconds(5));
@@ -22,33 +26,29 @@ namespace MDE_Monitoring_App.Services
             var status = new DefenderStatus();
             var effectiveTimeout = timeout ?? TimeSpan.FromSeconds(5);
 
-            // Try WMI first (gives richer live info). If fails, fall back to registry.
             bool local = string.IsNullOrWhiteSpace(targetMachine) ||
                          targetMachine.Equals("localhost", StringComparison.OrdinalIgnoreCase) ||
                          targetMachine.Equals(".", StringComparison.OrdinalIgnoreCase);
 
-            // WMI first (populates AMRunningMode directly from class)
             if (TryPopulateFromMpComputerStatus(targetMachine, status, effectiveTimeout))
             {
-                // If WMI did not return AMRunningMode for some reason, set a fallback indicator
                 if (string.IsNullOrWhiteSpace(status.AMRunningMode))
                     status.AMRunningMode = local ? "Unknown (WMI)" : "Unknown (Remote WMI)";
 
-                // WMI block (insert before 'return true;'):
                 if (string.IsNullOrWhiteSpace(status.DeviceControlDefaultEnforcement))
                     status.DeviceControlDefaultEnforcement = string.Empty;
 
-                // Add this to ensure post‑WMI registry fallback if needed:
                 if (status.IsTamperProtected == null)
                 {
                     status.IsTamperProtected = local ? ReadTamperProtectionLocal()
                                                      : (targetMachine != null ? ReadTamperProtectionRemote(targetMachine) : null);
                 }
 
+                // NEW: supplement values (Cloud/Sample/IOAV/OnAccess/SAC) via registry when WMI succeeded
+                SupplementFromRegistry(status, targetMachine);
                 return status;
             }
 
-            // Fallback registry path
             if (local)
             {
                 PopulateFromLocalRegistry(status);
@@ -68,7 +68,6 @@ namespace MDE_Monitoring_App.Services
                 }
             }
 
-            // If still missing versions, make a best-effort process hint
             if (string.IsNullOrWhiteSpace(status.AMProductVersion) ||
                 string.IsNullOrWhiteSpace(status.AMEngineVersion))
             {
@@ -111,7 +110,20 @@ namespace MDE_Monitoring_App.Services
                     s.DeviceControlDefaultEnforcement = mo["DeviceControlDefaultEnforcement"]?.ToString() ?? s.DeviceControlDefaultEnforcement;
                     s.DeviceControlState              = mo["DeviceControlState"]?.ToString() ?? s.DeviceControlState;
 
-                    // Simplified tamper property handling (covers bool / numeric / string)
+                    // New: scan ages
+                    if (int.TryParse(mo["QuickScanAge"]?.ToString(), out var qAge)) s.QuickScanAgeDays = qAge;
+                    if (int.TryParse(mo["FullScanAge"]?.ToString(), out var fAge))  s.FullScanAgeDays  = fAge;
+
+                    // New: IOAV / On-access / Smart App Control via WMI properties
+                    if (mo["IoavProtectionEnabled"] is bool ioavBool)
+                        s.IoavProtection = ioavBool ? "On" : "Off";
+                    if (mo["OnAccessProtectionEnabled"] is bool onAccBool)
+                        s.OnAccessProtection = onAccBool ? "On" : "Off";
+                    var sacStateObj = mo["SmartAppControlState"];
+                    if (sacStateObj != null && int.TryParse(sacStateObj.ToString(), out var sacState))
+                        s.SmartAppControl = sacState == 2 ? "On" : sacState == 1 ? "Eval" : sacState == 0 ? "Off" : "Unknown";
+
+                    // Simplified tamper property handling
                     try
                     {
                         var raw = mo["IsTamperProtected"];
@@ -126,7 +138,6 @@ namespace MDE_Monitoring_App.Services
                     if (string.IsNullOrWhiteSpace(s.DeviceControlDefaultEnforcement))
                         s.DeviceControlDefaultEnforcement = string.Empty;
 
-                    // Registry fallback for tamper protection if WMI didn't populate
                     if (!s.IsTamperProtected.HasValue)
                     {
                         var local = string.IsNullOrWhiteSpace(machine) ||
@@ -136,7 +147,6 @@ namespace MDE_Monitoring_App.Services
                                                     : (machine != null ? ReadTamperProtectionRemote(machine) : null);
                     }
 
-                    // PowerShell fallback if still unknown
                     if (!s.IsTamperProtected.HasValue)
                         s.IsTamperProtected = TryGetTamperProtectionViaPowerShell(machine, timeout);
 
@@ -155,7 +165,6 @@ namespace MDE_Monitoring_App.Services
             try
             {
                 var targetPart = string.IsNullOrWhiteSpace(machine) ? "" : $"-ComputerName '{machine}'";
-                // Get-MpComputerStatus is local only; remote requires Invoke-Command
                 var script = string.IsNullOrWhiteSpace(machine)
                     ? "(Get-MpComputerStatus).IsTamperProtected"
                     : $"Invoke-Command {targetPart} -ScriptBlock {{ (Get-MpComputerStatus).IsTamperProtected }}";
@@ -196,7 +205,7 @@ namespace MDE_Monitoring_App.Services
                 using var root = Registry.LocalMachine.OpenSubKey(RootKey);
                 using var sig  = Registry.LocalMachine.OpenSubKey(SigKey);
                 using var eng  = Registry.LocalMachine.OpenSubKey(EngineKey);
-                using var feat = Registry.LocalMachine.OpenSubKey(FeaturesKey); // NEW
+                using var feat = Registry.LocalMachine.OpenSubKey(FeaturesKey);
 
                 s.AMProductVersion = root?.GetValue("ProductVersion") as string ?? s.AMProductVersion;
                 s.AMEngineVersion  = sig?.GetValue("EngineVersion") as string
@@ -222,9 +231,33 @@ namespace MDE_Monitoring_App.Services
                         s.IsTamperProtected = parsed != 0;
                 }
 
-                // In PopulateFromLocalRegistry (end of try, before catch):
                 if (string.IsNullOrWhiteSpace(s.DeviceControlDefaultEnforcement))
                     s.DeviceControlDefaultEnforcement = string.Empty;
+
+                using var sp = Registry.LocalMachine.OpenSubKey(WDSpynet);
+                if (sp != null)
+                {
+                    int maps = Convert.ToInt32(sp.GetValue("SpyNetReporting", 0));
+                    s.CloudProtection = maps > 0 ? "On" : "Off";
+                    int submit = Convert.ToInt32(sp.GetValue("SubmitSamplesConsent", 0));
+                    s.SampleSubmission = (submit == 1 || submit == 3) ? "On" : "Off";
+                }
+
+                using var rt = Registry.LocalMachine.OpenSubKey(WDRealTime);
+                if (rt != null)
+                {
+                    int ioavDis = Convert.ToInt32(rt.GetValue("DisableIOAVProtection", 0));
+                    s.IoavProtection = ioavDis == 0 ? "On" : "Off";
+                    int onAccessDis = Convert.ToInt32(rt.GetValue("DisableOnAccessProtection", 0));
+                    s.OnAccessProtection = onAccessDis == 0 ? "On" : "Off";
+                }
+
+                using var sac = Registry.LocalMachine.OpenSubKey(CI_SAC_Key);
+                if (sac != null)
+                {
+                    int state = Convert.ToInt32(sac.GetValue("VerifiedAndReputablePolicyState", -1));
+                    s.SmartAppControl = state == 2 ? "On" : state == 1 ? "Eval" : state == 0 ? "Off" : "Unknown";
+                }
             }
             catch (Exception ex)
             {
@@ -234,7 +267,6 @@ namespace MDE_Monitoring_App.Services
 
         private string GetRtStatusLocal()
         {
-            // Lightweight local WMI attempt only for RealTimeProtection if full class failed
             try
             {
                 using var searcher = new ManagementObjectSearcher(
@@ -251,7 +283,6 @@ namespace MDE_Monitoring_App.Services
 
         private void PopulateFromLocalProcessHints(DefenderStatus s)
         {
-            // Fallback: try to read version of MsMpEng.exe if path known
             try
             {
                 var sysRoot = Environment.GetFolderPath(Environment.SpecialFolder.Windows);
@@ -304,7 +335,37 @@ namespace MDE_Monitoring_App.Services
                         s.IsTamperProtected = parsed != 0;
                 }
 
-                // In TryPopulateFromRemoteRegistry (before 'return true;'):
+                using (var sp = hklm.OpenSubKey(WDSpynet))
+                {
+                    if (sp != null)
+                    {
+                        int maps = Convert.ToInt32(sp.GetValue("SpyNetReporting", 0));
+                        s.CloudProtection = maps > 0 ? "On" : "Off";
+                        int submit = Convert.ToInt32(sp.GetValue("SubmitSamplesConsent", 0));
+                        s.SampleSubmission = (submit == 1 || submit == 3) ? "On" : "Off";
+                    }
+                }
+
+                using (var rt = hklm.OpenSubKey(WDRealTime))
+                {
+                    if (rt != null)
+                    {
+                        int ioavDis = Convert.ToInt32(rt.GetValue("DisableIOAVProtection", 0));
+                        s.IoavProtection = ioavDis == 0 ? "On" : "Off";
+                        int onAccessDis = Convert.ToInt32(rt.GetValue("DisableOnAccessProtection", 0));
+                        s.OnAccessProtection = onAccessDis == 0 ? "On" : "Off";
+                    }
+                }
+
+                using (var sac = hklm.OpenSubKey(CI_SAC_Key))
+                {
+                    if (sac != null)
+                    {
+                        int state = Convert.ToInt32(sac.GetValue("VerifiedAndReputablePolicyState", -1));
+                        s.SmartAppControl = state == 2 ? "On" : state == 1 ? "Eval" : state == 0 ? "Off" : "Unknown";
+                    }
+                }
+
                 if (string.IsNullOrWhiteSpace(s.DeviceControlDefaultEnforcement))
                     s.DeviceControlDefaultEnforcement = string.Empty;
 
@@ -318,7 +379,97 @@ namespace MDE_Monitoring_App.Services
         }
         #endregion
 
-        // Add these helper methods inside DefenderStatusService (e.g. below existing region blocks)
+        // NEW: Supplement after WMI success
+        private void SupplementFromRegistry(DefenderStatus s, string? machine)
+        {
+            try
+            {
+                bool local = string.IsNullOrWhiteSpace(machine) ||
+                             machine.Equals("localhost", StringComparison.OrdinalIgnoreCase) ||
+                             machine.Equals(".", StringComparison.OrdinalIgnoreCase);
+
+                if (local)
+                {
+                    using var sp = Registry.LocalMachine.OpenSubKey(WDSpynet);
+                    if (sp != null)
+                    {
+                        if (string.IsNullOrWhiteSpace(s.CloudProtection))
+                        {
+                            int maps = Convert.ToInt32(sp.GetValue("SpyNetReporting", 0));
+                            s.CloudProtection = maps > 0 ? "On" : "Off";
+                        }
+                        if (string.IsNullOrWhiteSpace(s.SampleSubmission))
+                        {
+                            int submit = Convert.ToInt32(sp.GetValue("SubmitSamplesConsent", 0));
+                            s.SampleSubmission = (submit == 1 || submit == 3) ? "On" : "Off";
+                        }
+                    }
+                    using var rt = Registry.LocalMachine.OpenSubKey(WDRealTime);
+                    if (rt != null)
+                    {
+                        if (string.IsNullOrWhiteSpace(s.IoavProtection))
+                        {
+                            int ioavDis = Convert.ToInt32(rt.GetValue("DisableIOAVProtection", 0));
+                            s.IoavProtection = ioavDis == 0 ? "On" : "Off";
+                        }
+                        if (string.IsNullOrWhiteSpace(s.OnAccessProtection))
+                        {
+                            int onAccessDis = Convert.ToInt32(rt.GetValue("DisableOnAccessProtection", 0));
+                            s.OnAccessProtection = onAccessDis == 0 ? "On" : "Off";
+                        }
+                    }
+                    using var sac = Registry.LocalMachine.OpenSubKey(CI_SAC_Key);
+                    if (sac != null && string.IsNullOrWhiteSpace(s.SmartAppControl))
+                    {
+                        int state = Convert.ToInt32(sac.GetValue("VerifiedAndReputablePolicyState", -1));
+                        s.SmartAppControl = state == 2 ? "On" : state == 1 ? "Eval" : state == 0 ? "Off" : "Unknown";
+                    }
+                }
+                else
+                {
+                    using var hklm = RegistryKey.OpenRemoteBaseKey(RegistryHive.LocalMachine, machine!);
+                    using var sp = hklm.OpenSubKey(WDSpynet);
+                    if (sp != null)
+                    {
+                        if (string.IsNullOrWhiteSpace(s.CloudProtection))
+                        {
+                            int maps = Convert.ToInt32(sp.GetValue("SpyNetReporting", 0));
+                            s.CloudProtection = maps > 0 ? "On" : "Off";
+                        }
+                        if (string.IsNullOrWhiteSpace(s.SampleSubmission))
+                        {
+                            int submit = Convert.ToInt32(sp.GetValue("SubmitSamplesConsent", 0));
+                            s.SampleSubmission = (submit == 1 || submit == 3) ? "On" : "Off";
+                        }
+                    }
+                    using var rt = hklm.OpenSubKey(WDRealTime);
+                    if (rt != null)
+                    {
+                        if (string.IsNullOrWhiteSpace(s.IoavProtection))
+                        {
+                            int ioavDis = Convert.ToInt32(rt.GetValue("DisableIOAVProtection", 0));
+                            s.IoavProtection = ioavDis == 0 ? "On" : "Off";
+                        }
+                        if (string.IsNullOrWhiteSpace(s.OnAccessProtection))
+                        {
+                            int onAccessDis = Convert.ToInt32(rt.GetValue("DisableOnAccessProtection", 0));
+                            s.OnAccessProtection = onAccessDis == 0 ? "On" : "Off";
+                        }
+                    }
+                    using var sac = hklm.OpenSubKey(CI_SAC_Key);
+                    if (sac != null && string.IsNullOrWhiteSpace(s.SmartAppControl))
+                    {
+                        int state = Convert.ToInt32(sac.GetValue("VerifiedAndReputablePolicyState", -1));
+                        s.SmartAppControl = state == 2 ? "On" : state == 1 ? "Eval" : state == 0 ? "Off" : "Unknown";
+                    }
+                }
+            }
+            catch
+            {
+                // ignore supplemental failures
+            }
+        }
+
         private bool? ReadTamperProtectionLocal()
         {
             try

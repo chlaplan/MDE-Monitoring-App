@@ -627,6 +627,14 @@ namespace MDE_Monitoring_App
                     DefenderStatus.DeviceControlDefaultEnforcement = newStatus.DeviceControlDefaultEnforcement;
                     DefenderStatus.DeviceControlState = newStatus.DeviceControlState;
                     DefenderStatus.IsTamperProtected = newStatus.IsTamperProtected;
+                    DefenderStatus.CloudProtection = newStatus.CloudProtection;
+                    DefenderStatus.SampleSubmission = newStatus.SampleSubmission;
+                    DefenderStatus.IoavProtection = newStatus.IoavProtection;
+                    DefenderStatus.OnAccessProtection = newStatus.OnAccessProtection;
+                    DefenderStatus.SmartAppControl = newStatus.SmartAppControl;
+                    // ADD THESE TWO LINES TO SURFACE WMI SCAN AGE VALUES
+                    DefenderStatus.FullScanAgeDays = newStatus.FullScanAgeDays;
+                    DefenderStatus.QuickScanAgeDays = newStatus.QuickScanAgeDays;
 
                     if (IsRemote)
                     {
@@ -1032,25 +1040,32 @@ namespace MDE_Monitoring_App
                 !string.IsNullOrWhiteSpace(s) &&
                 s.Trim().Equals("On", StringComparison.OrdinalIgnoreCase);
 
+            string NormalizeOnOff(string? v)
+            {
+                if (string.IsNullOrWhiteSpace(v)) return "Unknown";
+                var t = v.Trim();
+                return t.Equals("On", StringComparison.OrdinalIgnoreCase) ? "On"
+                     : t.Equals("Off", StringComparison.OrdinalIgnoreCase) ? "Off"
+                     : t.Equals("Eval", StringComparison.OrdinalIgnoreCase) ? "Eval"
+                     : t;
+            }
+
             var policy = _compliancePolicy;
 
-            // Always list each supported setting. If requirement flag is false -> "Not configured".
-            AddBool("Real-Time Protection", policy.RequireRealTimeProtection, IsOn(DefenderStatus.RealTimeProtection), "Core malware monitoring.");
-            AddBool("Tamper Protection", policy.RequireTamperProtection, DefenderStatus.IsTamperProtected == true, "Protects Defender settings.");
-            AddBool("Firewall Enabled", policy.RequireFirewall, FirewallProfileStatusesDisplay.Any(p => p.Enabled), "At least one enabled profile.");
-            AddBool("Device Control Enabled", policy.RequireDeviceControlEnabled,
-                !string.IsNullOrWhiteSpace(DefenderStatus.DeviceControlState) &&
-                !DefenderStatus.DeviceControlState.Contains("Disabled", StringComparison.OrdinalIgnoreCase),
-                "Device Control active.");
-
-            // These policy flags exist but current status properties are NOT in DefenderStatus.
-            // They are added with CurrentDisplay = 'Unknown' until underlying status values are provided.
-            AddBool("Cloud Protection", policy.RequireCloudProtection, false, "Status source not implemented (set to Unknown).");
-            AddBool("Sample Submission", policy.RequireSampleSubmission, false, "Status source not implemented (set to Unknown).");
-            AddBool("IOAV Protection", policy.RequireIoavProtection, false, "Status source not implemented (set to Unknown).");
-            AddBool("On-Access Protection", policy.RequireOnAccessProtection, false, "Status source not implemented (set to Unknown).");
-            AddBool("Antivirus Enabled", policy.RequireAntivirusEnabled, IsOn(DefenderStatus.RealTimeProtection), "Using Real-Time Protection as proxy.");
-            AddBool("Smart App Control", policy.RequireSmartAppControlOn, false, "Status source not implemented (set to Unknown).");
+            AddBool("Real-Time Protection",        policy.RequireRealTimeProtection,   DefenderStatus.RealTimeProtection,      IsOn(DefenderStatus.RealTimeProtection),      "Core malware monitoring.");
+            AddBool("Tamper Protection",           policy.RequireTamperProtection,     DefenderStatus.TamperProtectionDisplay, DefenderStatus.IsTamperProtected == true,    "Protects Defender settings.");
+            AddBool("Firewall Enabled",            policy.RequireFirewall,             FirewallProfileStatusesDisplay.Any(p => p.Enabled) ? "On" : "Off", FirewallProfileStatusesDisplay.Any(p => p.Enabled), "At least one enabled profile.");
+            AddBool("Device Control Enabled",      policy.RequireDeviceControlEnabled, DefenderStatus.DeviceControlState,      !string.IsNullOrWhiteSpace(DefenderStatus.DeviceControlState) &&
+                                                                                                                             !DefenderStatus.DeviceControlState.Contains("Disabled", StringComparison.OrdinalIgnoreCase),
+                                                                                                                             "Device Control active.");
+            AddBool("Cloud Protection",            policy.RequireCloudProtection,      DefenderStatus.CloudProtection,         IsOn(DefenderStatus.CloudProtection),         "MAPS cloud protection.");
+            AddBool("Sample Submission",           policy.RequireSampleSubmission,     DefenderStatus.SampleSubmission,        IsOn(DefenderStatus.SampleSubmission),        "Automatic sample submission.");
+            AddBool("IOAV Protection",             policy.RequireIoavProtection,       DefenderStatus.IoavProtection,          IsOn(DefenderStatus.IoavProtection),          "Inbound / file download scanning.");
+            AddBool("On-Access Protection",        policy.RequireOnAccessProtection,   DefenderStatus.OnAccessProtection,      IsOn(DefenderStatus.OnAccessProtection),      "On-access file scanning.");
+            AddBool("Smart App Control",           policy.RequireSmartAppControlOn,    DefenderStatus.SmartAppControl,         DefenderStatus.SmartAppControl.Equals("On", StringComparison.OrdinalIgnoreCase)
+                                                                                                                             || DefenderStatus.SmartAppControl.Equals("Eval", StringComparison.OrdinalIgnoreCase),
+                                                                                                                             "Smart App Control enforced (Eval accepted).");
+            AddBool("Antivirus Enabled",           policy.RequireAntivirusEnabled,     DefenderStatus.RealTimeProtection,      IsOn(DefenderStatus.RealTimeProtection),      "Using Real-Time Protection as proxy.");
 
             int? ParseHours(string? v)
             {
@@ -1062,17 +1077,17 @@ namespace MDE_Monitoring_App
 
             if (policy.RequireSignaturesUpToDate)
             {
-                AddAge("AV Signatures Age (hrs)", policy.MaxAntivirusSignatureAgeHours, ParseHours(DefenderStatus.AntivirusSignatureAge), "Antivirus signature freshness.");
+                AddAge("AV Signatures Age (hrs)",  policy.MaxAntivirusSignatureAgeHours,   ParseHours(DefenderStatus.AntivirusSignatureAge),   "Antivirus signature freshness.");
                 AddAge("ASW Signatures Age (hrs)", policy.MaxAntispywareSignatureAgeHours, ParseHours(DefenderStatus.AntispywareSignatureAge), "Antispyware signature freshness.");
             }
             else
             {
-                AddAge("AV Signatures Age (hrs)", 0, ParseHours(DefenderStatus.AntivirusSignatureAge), "Not configured.");
-                AddAge("ASW Signatures Age (hrs)", 0, ParseHours(DefenderStatus.AntispywareSignatureAge), "Not configured.");
+                AddAge("AV Signatures Age (hrs)", 0, ParseHours(DefenderStatus.AntivirusSignatureAge),   "Not configured.");
+                AddAge("ASW Signatures Age (hrs)",0, ParseHours(DefenderStatus.AntispywareSignatureAge), "Not configured.");
             }
 
-            AddAge("Full Scan Age (days)", policy.MaxFullScanAgeDays, null, "Scan timestamp not available.");
-            AddAge("Quick Scan Age (days)", policy.MaxQuickScanAgeDays, null, "Scan timestamp not available.");
+            AddAge("Full Scan Age (days)",  policy.MaxFullScanAgeDays,  DefenderStatus.FullScanAgeDays,  "Scan timestamp from WMI.");
+            AddAge("Quick Scan Age (days)", policy.MaxQuickScanAgeDays, DefenderStatus.QuickScanAgeDays, "Scan timestamp from WMI.");
 
             if (policy.DeviceControlGroupIds is { Count: > 0 })
             {
@@ -1134,21 +1149,20 @@ namespace MDE_Monitoring_App
                 });
             }
 
-            // Percentage: only count items truly required (RequiredDisplay != Not configured)
             var evaluable = ComplianceItems.Where(ci => !string.Equals(ci.RequiredDisplay, "Not configured", StringComparison.OrdinalIgnoreCase)).ToList();
             var passed = evaluable.Count(ci => ci.Compliant);
             CompliancePercentage = evaluable.Count == 0 ? 100 : (double)passed / evaluable.Count * 100.0;
             OnPropertyChanged(nameof(ComplianceSummaryDisplay));
 
-            void AddBool(string name, bool requiredFlag, bool current, string notes)
+            void AddBool(string name, bool requiredFlag, string rawValue, bool isOn, string notes)
             {
                 ComplianceItems.Add(new ComplianceItem
                 {
                     Name = name,
                     RequiredDisplay = requiredFlag ? "Required" : "Not configured",
-                    CurrentDisplay = current ? "On" : (current ? "On" : "Off/Unknown"),
-                    Compliant = requiredFlag ? current : true,
-                    CompliantDisplay = requiredFlag ? (current ? "Yes" : "No") : "N/A",
+                    CurrentDisplay = NormalizeOnOff(rawValue),
+                    Compliant = requiredFlag ? isOn : true,
+                    CompliantDisplay = requiredFlag ? (isOn ? "Yes" : "No") : "N/A",
                     Notes = notes
                 });
             }
