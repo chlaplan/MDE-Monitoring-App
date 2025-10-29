@@ -29,8 +29,10 @@
         <Menu Grid.Row="0">
             <MenuItem Header="_File">
                 <MenuItem Header="_Export PDF..." Click="ExportPdf_Click" />
+                <MenuItem Header="Compliance Manager..." Click="FileComplianceManager_Click" />
                 <Separator />
                 <MenuItem Header="E_xit" Click="FileExit_Click" />
+
             </MenuItem>
             <MenuItem Header="_Advanced Tools">
                 <MenuItem Header="_Netsh Trace..." Click="AdvancedNetworking_Click" />

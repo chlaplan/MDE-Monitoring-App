@@ -1,0 +1,205 @@
+﻿<Window x:Class="MDE_Monitoring_App.ComplianceManagerWindow"
+        xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        Title="Compliance Manager" Height="700" Width="840"
+        WindowStartupLocation="CenterOwner"
+        MinHeight="500" MinWidth="780">
+    <Grid Margin="12">
+        <Grid.RowDefinitions>
+            <RowDefinition Height="Auto"/>
+            <RowDefinition Height="*"/>
+            <RowDefinition Height="Auto"/>
+        </Grid.RowDefinitions>
+
+        <!-- Loaded policy banner -->
+        <Border Grid.Row="0" Padding="6" CornerRadius="4"
+                Background="{DynamicResource {x:Static SystemColors.ControlLightBrushKey}}"
+                BorderBrush="{DynamicResource {x:Static SystemColors.ControlDarkBrushKey}}"
+                BorderThickness="1" Margin="0,0,0,8">
+            <DockPanel LastChildFill="False">
+                <TextBlock Text="Loaded Policy:" FontWeight="Bold" Margin="0,0,6,0"/>
+                <TextBlock Text="{Binding CurrentPolicyName}" FontStyle="Italic"/>
+            </DockPanel>
+        </Border>
+
+        <!-- Policy definition area -->
+        <ScrollViewer Grid.Row="1" VerticalScrollBarVisibility="Auto">
+            <StackPanel Margin="4">
+                <!-- Name / Description -->
+                <Grid Margin="0,0,0,12">
+                    <Grid.ColumnDefinitions>
+                        <ColumnDefinition Width="140"/>
+                        <ColumnDefinition Width="*"/>
+                    </Grid.ColumnDefinitions>
+                    <TextBlock Text="Name" VerticalAlignment="Center"/>
+                    <TextBox Grid.Column="1" Text="{Binding EditingName, UpdateSourceTrigger=PropertyChanged}" />
+                    <TextBlock Grid.Row="1" Text="Description" Margin="0,8,0,0" VerticalAlignment="Top"/>
+                    <TextBox Grid.Row="1" Grid.Column="1" Margin="0,8,0,0"
+                             Text="{Binding EditingDescription, UpdateSourceTrigger=PropertyChanged}"
+                             AcceptsReturn="True" Height="70" TextWrapping="Wrap" />
+                    <Grid.RowDefinitions>
+                        <RowDefinition Height="Auto"/>
+                        <RowDefinition Height="Auto"/>
+                    </Grid.RowDefinitions>
+                </Grid>
+
+                <Separator/>
+
+                <!-- Settings laid out in categorized panels -->
+                <!-- REPLACED UniformGrid WITH Grid TO ALLOW SPANNING -->
+                <Grid Margin="0,12,0,0">
+                    <Grid.RowDefinitions>
+                        <RowDefinition Height="Auto"/>
+                        <RowDefinition Height="Auto"/>
+                    </Grid.RowDefinitions>
+                    <Grid.ColumnDefinitions>
+                        <ColumnDefinition Width="*"/>
+                        <ColumnDefinition Width="*"/>
+                        <ColumnDefinition Width="*"/>
+                    </Grid.ColumnDefinitions>
+
+                    <!-- Core Protection -->
+                    <GroupBox Header="Core Protection" Grid.Row="0" Grid.Column="0" Margin="0,0,8,6" Padding="4">
+                        <StackPanel>
+                            <CheckBox Content="Real-time Protection"
+                                      ToolTip="Requires Microsoft Defender real-time monitoring (scans files as they are accessed)."
+                                      IsChecked="{Binding RequireRealTimeProtection}" Margin="0,0,0,2"/>
+                            <CheckBox Content="Antivirus Enabled"
+                                      ToolTip="Ensures the Defender AV engine is enabled and not turned off or passive."
+                                      IsChecked="{Binding RequireAntivirusEnabled}" Margin="0,0,0,2"/>
+                            <CheckBox Content="On-Access Protection"
+                                      ToolTip="Requires on-access scanning (active file interception) to be enabled."
+                                      IsChecked="{Binding RequireOnAccessProtection}" Margin="0,0,0,2"/>
+                            <CheckBox Content="IOAV Protection"
+                                      ToolTip="Checks Internet/Network file (IOAV) scanning for downloads and web-origin files."
+                                      IsChecked="{Binding RequireIoavProtection}" Margin="0,0,0,2"/>
+                            <CheckBox Content="Tamper Protection"
+                                      ToolTip="Prevents malicious or manual changes to core Defender security settings."
+                                      IsChecked="{Binding RequireTamperProtection}" Margin="0,0,0,0"/>
+                        </StackPanel>
+                    </GroupBox>
+
+                    <!-- Cloud / Network -->
+                    <GroupBox Header="Cloud / Network" Grid.Row="0" Grid.Column="1" Margin="0,0,8,6" Padding="4">
+                        <StackPanel>
+                            <CheckBox Content="Cloud Protection (NIS)"
+                                      ToolTip="Requires cloud-delivered protection (MAPS/NIS) for faster detection and blocking."
+                                      IsChecked="{Binding RequireCloudProtection}" Margin="0,0,0,2"/>
+                            <CheckBox Content="Sample Submission"
+                                      ToolTip="Requires automatic submission of suspicious samples to Microsoft for analysis."
+                                      IsChecked="{Binding RequireSampleSubmission}" Margin="0,0,0,2"/>
+                            <CheckBox Content="Firewall Enabled"
+                                      ToolTip="Verifies Windows Defender Firewall is enabled for host network filtering."
+                                      IsChecked="{Binding RequireFirewall}" Margin="0,0,0,2"/>
+                            <CheckBox Content="Signatures Up-to-date"
+                                      ToolTip="Requires signatures to meet freshness thresholds (see signature age fields below)."
+                                      IsChecked="{Binding RequireSignaturesUpToDate}" Margin="0,0,0,0"/>
+                        </StackPanel>
+                    </GroupBox>
+
+                    <!-- Control / Integrity -->
+                    <GroupBox Header="Control / Integrity" Grid.Row="0" Grid.Column="2" Margin="0,0,0,6" Padding="4">
+                        <StackPanel>
+                            <CheckBox Content="Device Control Enabled"
+                                      ToolTip="Requires Defender Device Control (removable media and peripheral enforcement) to be active."
+                                      IsChecked="{Binding RequireDeviceControlEnabled}" Margin="0,0,0,2"/>
+                            <CheckBox Content="Smart App Control On"
+                                      ToolTip="Requires Smart App Control (application reputation/blocking) to be enforced."
+                                      IsChecked="{Binding RequireSmartAppControlOn}" Margin="0,0,0,0"/>
+                        </StackPanel>
+                    </GroupBox>
+
+                    <!-- Combined Scan & Signature Age Limits -->
+                    <GroupBox Header="Scan and Signature Age Limits" Grid.Row="1" Grid.Column="0" Margin="0,0,8,0" Padding="4">
+                        <Grid>
+                            <Grid.Resources>
+                                <Style TargetType="TextBlock">
+                                    <Setter Property="FontSize" Value="11"/>
+                                    <Setter Property="TextWrapping" Value="NoWrap"/>
+                                    <Setter Property="TextTrimming" Value="CharacterEllipsis"/>
+                                </Style>
+                            </Grid.Resources>
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="150"/>
+                                <ColumnDefinition Width="70"/>
+                            </Grid.ColumnDefinitions>
+                            <Grid.RowDefinitions>
+                                <RowDefinition Height="Auto"/>
+                                <RowDefinition Height="Auto"/>
+                                <RowDefinition Height="Auto"/>
+                                <RowDefinition Height="Auto"/>
+                            </Grid.RowDefinitions>
+
+                            <TextBlock Grid.Row="0" Grid.Column="0" Text="Full Scan Age (days)"
+                                       ToolTip="Maximum allowed age since last successful FULL scan."/>
+                            <TextBox   Grid.Row="0" Grid.Column="1" Width="60"
+                                       ToolTip="Enter max days since last full system scan."
+                                       Text="{Binding MaxFullScanAgeDays, UpdateSourceTrigger=PropertyChanged}" Margin="4,0,0,2"/>
+
+                            <TextBlock Grid.Row="1" Grid.Column="0" Text="Quick Scan Age (days)"
+                                       ToolTip="Maximum allowed age since last QUICK scan."/>
+                            <TextBox   Grid.Row="1" Grid.Column="1" Width="60"
+                                       ToolTip="Enter max days since last quick scan."
+                                       Text="{Binding MaxQuickScanAgeDays, UpdateSourceTrigger=PropertyChanged}" Margin="4,0,0,2"/>
+
+                            <TextBlock Grid.Row="2" Grid.Column="0" Text="AV Signature Age (hrs)"
+                                       ToolTip="Maximum allowed age of Antivirus (malware) signatures in hours."/>
+                            <TextBox   Grid.Row="2" Grid.Column="1" Width="60"
+                                       ToolTip="Enter max hours since last AV signature update."
+                                       Text="{Binding MaxAntivirusSignatureAgeHours, UpdateSourceTrigger=PropertyChanged}" Margin="4,0,0,2"/>
+
+                            <TextBlock Grid.Row="3" Grid.Column="0" Text="ASW Signature Age (hrs)"
+                                       ToolTip="Maximum allowed age of Antispyware signatures in hours."/>
+                            <TextBox   Grid.Row="3" Grid.Column="1" Width="60"
+                                       ToolTip="Enter max hours since last antispyware signature update."
+                                       Text="{Binding MaxAntispywareSignatureAgeHours, UpdateSourceTrigger=PropertyChanged}" Margin="4,0,0,0"/>
+                        </Grid>
+                    </GroupBox>
+
+                    <!-- Device Control IDs (expanded width) -->
+                    <GroupBox Header="Device Control IDs" Grid.Row="1" Grid.Column="1" Grid.ColumnSpan="2" Margin="0,0,0,0" Padding="4"
+                              ToolTip="Configure specific Device Control policy group and rule identifiers enforced for compliance.">
+                        <Grid>
+                            <Grid.RowDefinitions>
+                                <RowDefinition Height="Auto"/>
+                                <RowDefinition Height="*"/>
+                                <RowDefinition Height="Auto"/>
+                                <RowDefinition Height="*"/>
+                            </Grid.RowDefinitions>
+                            <TextBlock Grid.Row="0" Text="Policy Group IDs (one per line)"
+                                       ToolTip="Each line: a Device Control policy GROUP identifier required for compliance."
+                                       Margin="0,0,0,4"/>
+                            <TextBox Grid.Row="1" Height="90" AcceptsReturn="True" VerticalScrollBarVisibility="Auto"
+                                     ToolTip="Enter one group ID per line. Blank lines ignored."
+                                     Text="{Binding EditingDeviceControlGroupIds, UpdateSourceTrigger=PropertyChanged}" />
+                            <TextBlock Grid.Row="2" Text="Policy Rule IDs (one per line)"
+                                       ToolTip="Each line: a Device Control policy RULE identifier required for compliance."
+                                       Margin="0,8,0,4"/>
+                            <TextBox Grid.Row="3" Height="90" AcceptsReturn="True" VerticalScrollBarVisibility="Auto"
+                                     ToolTip="Enter one rule ID per line. Blank lines ignored."
+                                     Text="{Binding EditingDeviceControlRuleIds, UpdateSourceTrigger=PropertyChanged}" />
+                        </Grid>
+                    </GroupBox>
+                </Grid>
+
+                <Separator Margin="0,12,0,8"/>
+
+                <!-- Action buttons -->
+                <StackPanel Orientation="Horizontal" HorizontalAlignment="Right">
+                    <Button Content="New" Width="70" Margin="0,0,6,0"
+                            Command="{Binding NewPolicyCommand}"/>
+                    <Button Content="Load" Width="70" Margin="0,0,6,0"
+                            Command="{Binding LoadPolicyCommand}"/>
+                    <Button Content="Save" Width="70" Margin="0,0,6,0"
+                            Command="{Binding SavePolicyCommand}"/>
+                    <Button Content="Close" Width="70" IsCancel="True"
+                            Command="{Binding CloseWindowCommand}"/>
+                </StackPanel>
+            </StackPanel>
+        </ScrollViewer>
+
+        <StatusBar Grid.Row="2">
+            <StatusBarItem Content="{Binding StatusMessage}"/>
+        </StatusBar>
+    </Grid>
+</Window>

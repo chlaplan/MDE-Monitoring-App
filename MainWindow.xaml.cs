@@ -224,5 +224,16 @@ namespace MDE_Monitoring_App
                 $"MDE Monitoring App\nVersion: {asm.Version}\nStrong Name Token: {string.Concat(asm.GetPublicKeyToken().Select(b => b.ToString("x2")))}",
                 "About", MessageBoxButton.OK, MessageBoxImage.Information);
         }
+
+        private void FileComplianceManager_Click(object sender, RoutedEventArgs e)
+        {
+            var rootVm = DataContext as MainViewModel;
+            var win = new ComplianceManagerWindow
+            {
+                Owner = this,
+                DataContext = new ComplianceManagerViewModel(rootVm)
+            };
+            win.ShowDialog();
+        }
     }
 }

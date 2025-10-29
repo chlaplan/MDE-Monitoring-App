@@ -1,0 +1,14 @@
+<UserControl x:Class="MDE_Monitoring_App.Controls.CompliancePieChart"
+             xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             Height="120" Width="120">
+    <Grid>
+        <!-- Non-compliant remainder (now Red instead of gray) -->
+        <Ellipse Fill="{Binding NonCompliantColor, RelativeSource={RelativeSource AncestorType=UserControl}}"/>
+        <!-- Compliant portion slice (always Green) -->
+        <Path x:Name="SlicePath" Fill="{Binding CompliantColor, RelativeSource={RelativeSource AncestorType=UserControl}}"/>
+        <TextBlock Text="{Binding DataContext.ComplianceSummaryDisplay, RelativeSource={RelativeSource AncestorType=Window}}"
+                   HorizontalAlignment="Center" VerticalAlignment="Center"
+                   TextWrapping="Wrap" FontSize="10" Foreground="Black" TextAlignment="Center" Margin="4"/>
+    </Grid>
+</UserControl>
