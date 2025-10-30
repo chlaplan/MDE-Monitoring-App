@@ -818,13 +818,13 @@
                                            FontSize="18"
                                            FontWeight="Bold"
                                            Foreground="#0078D4"/>
-                                <!-- NEW: Prominent current policy name -->
+                                <!-- NEW: Prominent current policy name 
                                 <TextBlock Text="{Binding CompliancePolicyName}"
                                            Margin="0,4,0,0"
                                            FontSize="16"
                                            FontWeight="SemiBold"
                                            Foreground="#004578"
-                                           ToolTip="Current compliance policy name"/>
+                                           ToolTip="Current compliance policy name"/>-->
                             </StackPanel>
 
                             <controls:CompliancePieChart Percentage="{Binding CompliancePercentage}"

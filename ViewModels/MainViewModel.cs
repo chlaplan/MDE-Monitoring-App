@@ -1072,6 +1072,34 @@ namespace MDE_Monitoring_App
                                                                                                                              "Smart App Control enforced (Eval accepted).");
             AddBool("Antivirus Enabled",           policy.RequireAntivirusEnabled,     DefenderStatus.RealTimeProtection,      IsOn(DefenderStatus.RealTimeProtection),      "Using Real-Time Protection as proxy.");
 
+            // NEW: DeviceControlDefaultEnforcement value check
+            if (!string.IsNullOrWhiteSpace(policy.RequiredDeviceControlDefaultEnforcement))
+            {
+                var current = (DefenderStatus.DeviceControlDefaultEnforcement ?? "").Trim();
+                var required = policy.RequiredDeviceControlDefaultEnforcement.Trim();
+                ComplianceItems.Add(new ComplianceItem
+                {
+                    Name = "DeviceControlDefaultEnforcement",
+                    RequiredDisplay = required,
+                    CurrentDisplay = string.IsNullOrWhiteSpace(current) ? "Unknown" : current,
+                    Compliant = string.Equals(current, required, StringComparison.OrdinalIgnoreCase),
+                    CompliantDisplay = string.Equals(current, required, StringComparison.OrdinalIgnoreCase) ? "Yes" : "No",
+                    Notes = "Default USB/storage access baseline."
+                });
+            }
+            else
+            {
+                ComplianceItems.Add(new ComplianceItem
+                {
+                    Name = "DeviceControlDefaultEnforcement",
+                    RequiredDisplay = "Not configured",
+                    CurrentDisplay = string.IsNullOrWhiteSpace(DefenderStatus.DeviceControlDefaultEnforcement) ? "Unknown" : DefenderStatus.DeviceControlDefaultEnforcement,
+                    Compliant = true,
+                    CompliantDisplay = "N/A",
+                    Notes = "No required baseline."
+                });
+            }
+
             int? ParseHours(string? v)
             {
                 if (string.IsNullOrWhiteSpace(v)) return null;

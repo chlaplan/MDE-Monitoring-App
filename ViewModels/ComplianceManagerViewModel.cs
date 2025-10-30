@@ -99,6 +99,12 @@ public sealed class ComplianceManagerViewModel : INotifyPropertyChanged
 
     public string StatusMessage { get => _statusMessage; set => Set(ref _statusMessage, value); }
     private string _statusMessage = "Ready";
+    public string RequiredDeviceControlDefaultEnforcement
+    {
+        get => _requiredDeviceControlDefaultEnforcement;
+        set => Set(ref _requiredDeviceControlDefaultEnforcement, value);
+    }
+    private string _requiredDeviceControlDefaultEnforcement = "";
 
     // Commands
     public ICommand NewPolicyCommand { get; }
@@ -120,6 +126,7 @@ public sealed class ComplianceManagerViewModel : INotifyPropertyChanged
         MaxAntispywareSignatureAgeHours = 24;
         EditingDeviceControlGroupIds = string.Empty;
         EditingDeviceControlRuleIds = string.Empty;
+        RequiredDeviceControlDefaultEnforcement = "";
         CurrentPolicyName = "(unsaved)";
         StatusMessage = "New policy draft.";
     }
@@ -197,7 +204,8 @@ public sealed class ComplianceManagerViewModel : INotifyPropertyChanged
         MaxAntivirusSignatureAgeHours = MaxAntivirusSignatureAgeHours,
         MaxAntispywareSignatureAgeHours = MaxAntispywareSignatureAgeHours,
         DeviceControlGroupIds = ParseIds(EditingDeviceControlGroupIds),
-        DeviceControlRuleIds = ParseIds(EditingDeviceControlRuleIds)
+        DeviceControlRuleIds = ParseIds(EditingDeviceControlRuleIds),
+        RequiredDeviceControlDefaultEnforcement = RequiredDeviceControlDefaultEnforcement
     };
 
     private void ApplyPolicyToEditing(CompliancePolicy p)
@@ -221,6 +229,7 @@ public sealed class ComplianceManagerViewModel : INotifyPropertyChanged
         MaxAntispywareSignatureAgeHours = p.MaxAntispywareSignatureAgeHours;
         EditingDeviceControlGroupIds = string.Join(Environment.NewLine, p.DeviceControlGroupIds ?? new List<string>());
         EditingDeviceControlRuleIds = string.Join(Environment.NewLine, p.DeviceControlRuleIds ?? new List<string>());
+        RequiredDeviceControlDefaultEnforcement = p.RequiredDeviceControlDefaultEnforcement;
     }
 
     private static List<string> ParseIds(string text) =>
@@ -317,6 +326,21 @@ public sealed class CompliancePolicy : INotifyPropertyChanged
 
     public List<string>? DeviceControlRuleIds { get => _deviceControlRuleIds; set { if (_deviceControlRuleIds != value) { _deviceControlRuleIds = value; OnPropertyChanged(); } } }
     private List<string>? _deviceControlRuleIds;
+
+    public string RequiredDeviceControlDefaultEnforcement
+    {
+        get => _requiredDeviceControlDefaultEnforcement;
+        set => Set(ref _requiredDeviceControlDefaultEnforcement, value);
+    }
+    private string _requiredDeviceControlDefaultEnforcement = "";
+
+    private bool Set<T>(ref T field, T value, [CallerMemberName] string? name = null)
+    {
+        if (Equals(field, value)) return false;
+        field = value;
+        OnPropertyChanged(name);
+        return true;
+    }
 
     public event PropertyChangedEventHandler? PropertyChanged;
     private void OnPropertyChanged([CallerMemberName] string? name = null) =>

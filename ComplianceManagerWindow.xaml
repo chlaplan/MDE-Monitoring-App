@@ -1,7 +1,7 @@
 ﻿<Window x:Class="MDE_Monitoring_App.ComplianceManagerWindow"
         xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
         xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
-        Title="Compliance Manager" Height="700" Width="840"
+        Title="Compliance Manager" Height="750" Width="880"
         WindowStartupLocation="CenterOwner"
         MinHeight="500" MinWidth="780">
     <Grid Margin="12">
@@ -46,10 +46,11 @@
                 <Separator/>
 
                 <!-- Settings laid out in categorized panels -->
-                <!-- REPLACED UniformGrid WITH Grid TO ALLOW SPANNING -->
                 <Grid Margin="0,12,0,0">
                     <Grid.RowDefinitions>
                         <RowDefinition Height="Auto"/>
+                        <RowDefinition Height="Auto"/>
+                        <!-- NEW ROW for Default Enforcement placement -->
                         <RowDefinition Height="Auto"/>
                     </Grid.RowDefinitions>
                     <Grid.ColumnDefinitions>
@@ -109,7 +110,7 @@
                         </StackPanel>
                     </GroupBox>
 
-                    <!-- Combined Scan & Signature Age Limits -->
+                    <!-- Scan & Signature Age Limits -->
                     <GroupBox Header="Scan and Signature Age Limits" Grid.Row="1" Grid.Column="0" Margin="0,0,8,0" Padding="4">
                         <Grid>
                             <Grid.Resources>
@@ -156,7 +157,7 @@
                         </Grid>
                     </GroupBox>
 
-                    <!-- Device Control IDs (expanded width) -->
+                    <!-- Device Control IDs -->
                     <GroupBox Header="Device Control IDs" Grid.Row="1" Grid.Column="1" Grid.ColumnSpan="2" Margin="0,0,0,0" Padding="4"
                               ToolTip="Configure specific Device Control policy group and rule identifiers enforced for compliance.">
                         <Grid>
@@ -179,6 +180,23 @@
                                      ToolTip="Enter one rule ID per line. Blank lines ignored."
                                      Text="{Binding EditingDeviceControlRuleIds, UpdateSourceTrigger=PropertyChanged}" />
                         </Grid>
+                    </GroupBox>
+
+                    <!-- MOVED: DeviceControlDefaultEnforcement (no longer overlapping) -->
+                    <GroupBox Header="Device Control Default Enforcement"
+                              Grid.Row="2" Grid.Column="0" Grid.ColumnSpan="3"
+                              Margin="0,12,0,0" Padding="4"
+                              ToolTip="Baseline default allow/deny mode for devices when no specific rule matches.">
+                        <StackPanel Orientation="Horizontal">
+                            <TextBlock Text="Enforcement Mode:" VerticalAlignment="Center" Margin="0,0,8,0"/>
+                            <ComboBox Width="160"
+                                      SelectedValue="{Binding RequiredDeviceControlDefaultEnforcement, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}"
+                                      SelectedValuePath="Tag">
+                                <ComboBoxItem Content="(Not configured)" Tag=""/>
+                                <ComboBoxItem Content="DefaultDeny" Tag="DefaultDeny"/>
+                                <ComboBoxItem Content="DefaultAllow" Tag="DefaultAllow"/>
+                            </ComboBox>
+                        </StackPanel>
                     </GroupBox>
                 </Grid>
 

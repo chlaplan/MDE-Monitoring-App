@@ -1,6 +1,6 @@
 {
-  "Name": "Baseline",
-  "Description": "Baseline defender compliance.",
+  "Name": "Sample Baseline",
+  "Description": "Baseline policy including default device control enforcement.",
   "RequireRealTimeProtection": true,
   "RequireTamperProtection": true,
   "RequireCloudProtection": true,
@@ -13,5 +13,6 @@
   "RequireSmartAppControlOn": true,
   "RequireSignaturesUpToDate": true,
   "MaxFullScanAgeDays": 0,
-  "MaxQuickScanAgeDays": 0
+  "MaxQuickScanAgeDays": 0,
+  "RequiredDeviceControlDefaultEnforcement": "DefaultDeny"
 }
