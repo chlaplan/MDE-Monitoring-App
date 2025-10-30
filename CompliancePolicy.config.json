@@ -14,5 +14,4 @@
   "RequireSignaturesUpToDate": true,
   "MaxFullScanAgeDays": 0,
   "MaxQuickScanAgeDays": 0,
-  "RequiredDeviceControlDefaultEnforcement": "DefaultDeny"
 }
