@@ -828,8 +828,23 @@
                             </StackPanel>
 
                             <controls:CompliancePieChart Percentage="{Binding CompliancePercentage}"
-                                                         Width="130" Height="130"
-                                                         ToolTip="{Binding ComplianceSummaryDisplay}"/>
+                             Width="130" Height="130"
+                             ToolTip="{Binding ComplianceSummaryDisplay}">
+                                <controls:CompliancePieChart.Style>
+                                    <Style TargetType="controls:CompliancePieChart">
+                                        <!-- Defaults when a policy exists -->
+                                        <Setter Property="CompliantColor" Value="#1E7D24"/>
+                                        <Setter Property="NonCompliantColor" Value="#C42B1C"/>
+                                        <Style.Triggers>
+                                            <!-- No policy: both gray so entire circle gray -->
+                                            <DataTrigger Binding="{Binding HasCompliancePolicy}" Value="False">
+                                                <Setter Property="CompliantColor" Value="#B3B3B3"/>
+                                                <Setter Property="NonCompliantColor" Value="#B3B3B3"/>
+                                            </DataTrigger>
+                                        </Style.Triggers>
+                                    </Style>
+                                </controls:CompliancePieChart.Style>
+                            </controls:CompliancePieChart>
 
                             <StackPanel Margin="20,0,0,0" VerticalAlignment="Center" Width="320">
                                 <!-- UPDATED: Use existing properties from MainViewModel -->

@@ -960,6 +960,7 @@ namespace MDE_Monitoring_App
         public string IntuneEnrollmentUpn => _intuneEnrollmentInfo.UPN;
         public string IntuneEnrollmentState => _intuneEnrollmentInfo.EnrollmentStateDisplay;
         public bool IsIntuneCoManaged => _intuneEnrollmentInfo.IsCoManaged;
+        public bool HasCompliancePolicy => _compliancePolicy != null;
 
         // Updated combined display to use derived values
         public string IntuneEnrollmentDisplay =>
@@ -1004,7 +1005,8 @@ namespace MDE_Monitoring_App
                     _compliancePolicy = null;
                     OnPropertyChanged(nameof(CompliancePolicyName));
                     OnPropertyChanged(nameof(CompliancePolicyDescription));
-                    OnPropertyChanged(nameof(CompliancePolicyHeader)); // ADD
+                    OnPropertyChanged(nameof(CompliancePolicyHeader));
+                    OnPropertyChanged(nameof(HasCompliancePolicy));
                     ComplianceItems.Clear();
                     CompliancePercentage = 0;
                     return;
@@ -1013,7 +1015,8 @@ namespace MDE_Monitoring_App
                 _compliancePolicy = JsonSerializer.Deserialize<CompliancePolicy>(json);
                 OnPropertyChanged(nameof(CompliancePolicyName));
                 OnPropertyChanged(nameof(CompliancePolicyDescription));
-                OnPropertyChanged(nameof(CompliancePolicyHeader)); // ADD
+                OnPropertyChanged(nameof(CompliancePolicyHeader));
+                OnPropertyChanged(nameof(HasCompliancePolicy));
             }
             catch (Exception ex)
             {
@@ -1026,7 +1029,8 @@ namespace MDE_Monitoring_App
                 _compliancePolicy = null;
                 OnPropertyChanged(nameof(CompliancePolicyName));
                 OnPropertyChanged(nameof(CompliancePolicyDescription));
-                OnPropertyChanged(nameof(CompliancePolicyHeader)); // ADD
+                OnPropertyChanged(nameof(CompliancePolicyHeader));
+                OnPropertyChanged(nameof(HasCompliancePolicy));
             }
             EvaluateCompliance();
         }
