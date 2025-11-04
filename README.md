@@ -17,10 +17,7 @@ Lightweight desktop dashboard for quickly inspecting Microsoft Defender / endpoi
 - Performance: Background collection, UI virtualization, deferred heavy detail loading.
 
 ## Quick Start
-1. Build (.NET 8 SDK + Visual Studio 2022)
-2. Run elevated for full data
-3. Click Refresh (or startup auto-refresh)
-4. (Optional) Load compliance policy: place `CompliancePolicy.config.json` beside exe.
+1. Download ZIP file from releases ![link]https://aka.ms/MDETool
 
 ## WDAC Workflow
 - Press Reload WDAC Policies
