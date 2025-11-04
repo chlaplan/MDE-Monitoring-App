@@ -17,7 +17,7 @@ Lightweight desktop dashboard for quickly inspecting Microsoft Defender / endpoi
 - Performance: Background collection, UI virtualization, deferred heavy detail loading.
 
 ## Quick Start
-1. Download ZIP file from releases ![link]https://aka.ms/MDETool
+Download latest ZIP file from releases https://aka.ms/MDETool
 
 ## WDAC Workflow
 - Press Reload WDAC Policies
