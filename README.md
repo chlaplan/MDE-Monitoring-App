@@ -35,10 +35,10 @@ Download latest ZIP file from releases https://aka.ms/MDETool
 
 ## Screenshots
 ![Overview](Screenshots/Overview.jpg)
-![Policies Placeholder](Screenshots/Policies.png)
-![WDAC Placeholder](Screenshots/WDAC.png)
-![Compliance Placeholder](Screenshots/Compliance.png)
-![PDF Placeholder](Screenshots/Pdf.png)
+![Policies Placeholder](Screenshots/MDEPolicies.jpg)
+![WDAC Placeholder](Screenshots/WDAC.jpg)
+![Compliance Placeholder](Screenshots/Compliance.jpg)
+
 
 ## Configuration Files
 - `Data/DefenderPolicyDefinitions.json` (policy interpretation)
