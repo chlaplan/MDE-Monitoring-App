@@ -1,3 +1,5 @@
+Microsoft makes no guarantees—no warranties, support, maintenance, performance assurances, or commitments regarding security, compliance, or fitness for a particular purpose.
+
 # MDE Monitoring App (WPF / .NET 8)
 
 Lightweight desktop dashboard for quickly inspecting Microsoft Defender / endpoint security posture (local or remote).
