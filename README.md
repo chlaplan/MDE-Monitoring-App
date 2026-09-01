@@ -1,6 +1,6 @@
 # MDE Toolkit
 
-> **Microsoft makes no guarantees** — no warranties, support, maintenance, performance assurances, or commitments regarding security, compliance, or fitness for a particular purpose.
+> This project is not affiliated with or endorsed by Microsoft. Microsoft offers no warranties, support, maintenance, performance assurances, or commitments regarding security, compliance, or fitness for a particular purpose.
 
 🌐 **Website:** [https://aka.ms/mdetool](https://aka.ms/mdetool)
 
