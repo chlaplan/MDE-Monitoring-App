@@ -2,7 +2,7 @@
 
 > **Microsoft makes no guarantees** — no warranties, support, maintenance, performance assurances, or commitments regarding security, compliance, or fitness for a particular purpose.
 
-🌐 **Website:** [https://aka.ms/mdetool](https://aka.ms/mdetool)
+🌐 **Website:** [https://mdetoolkit.org/](https://aka.ms/mdetool)
 
 Free, open-source desktop tool for monitoring and managing Microsoft Defender for Endpoint security posture. Built with WPF / .NET 8.
 
